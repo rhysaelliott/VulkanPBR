@@ -29,3 +29,43 @@
             abort();                                                    \
         }                                                               \
     } while (0)
+
+struct DelectionQueue
+{
+	std::deque<std::function<void()>> deletors;
+
+	void push_function(std::function<void()>&& function)
+	{
+		deletors.push_back(function);
+	}
+
+	void flush()
+	{
+		for (auto it = deletors.rbegin(); it != deletors.rend(); it++)
+		{
+			(*it)();
+		}
+
+		deletors.clear();
+	}
+};
+
+struct FrameData
+{
+	VkCommandPool _commandPool;
+	VkCommandBuffer _mainCommandBuffer;
+
+	VkSemaphore _swapchainSemaphore, _renderSemaphore;
+	VkFence _renderFence;
+
+	DelectionQueue _deletionQueue;
+};
+
+struct AllocatedImage
+{
+	VkImage image;
+	VkImageView imageView;
+	VmaAllocation allocation;
+	VkExtent3D imageExtent;
+	VkFormat imageFormat;
+};
