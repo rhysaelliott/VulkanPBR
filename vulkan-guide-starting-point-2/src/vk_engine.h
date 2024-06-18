@@ -5,6 +5,17 @@
 
 #include <vk_types.h>
 
+struct FrameData
+{
+	VkCommandPool _commandPool;
+	VkCommandBuffer _mainCommandBuffer;
+
+	VkSemaphore _swapchainSemaphore, _renderSemaphore;
+	VkFence _renderFence;
+};
+
+constexpr unsigned int FRAME_OVERLAP = 2;
+
 class VulkanEngine {
 public:
 
@@ -27,10 +38,16 @@ public:
 	//swapchain members
 	VkSwapchainKHR _swapchain;
 	VkFormat _swapchainImageFormat;
-
 	std::vector<VkImage> _swapchainImages;
 	std::vector<VkImageView> _swapchainImageViews;
 	VkExtent2D _swapchainExtent;
+
+	//frame members
+	FrameData _frames[FRAME_OVERLAP];
+
+	//graphics members
+	VkQueue _graphicsQueue;
+	uint32_t _graphicsQueueFamily;
 
 	//initializes everything in the engine
 	void init();
@@ -43,6 +60,9 @@ public:
 
 	//run main loop
 	void run();
+
+	//frame member functions
+	FrameData& get_current_frame() { return _frames[_frameNumber % FRAME_OVERLAP]; };
 
 private:
 	void init_vulkan();
