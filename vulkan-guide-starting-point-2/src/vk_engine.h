@@ -4,6 +4,8 @@
 #pragma once
 
 #include <vk_types.h>
+#include <vk_descriptors.h>
+#include <vk_pipelines.h>
 
 
 
@@ -40,12 +42,22 @@ public:
 	AllocatedImage _drawImage;
 	VkExtent2D _drawExtent;
 
+	//descriptor members
+	DescriptorAllocator globalDescriptorAllocator;
+
+	VkDescriptorSet _drawImageDescriptors;
+	VkDescriptorSetLayout _drawImageDescriptorLayout;
+
 	//frame members
 	FrameData _frames[FRAME_OVERLAP];
 
 	//graphics members
 	VkQueue _graphicsQueue;
 	uint32_t _graphicsQueueFamily;
+
+	//compute pipeline members
+	VkPipeline _gradientPipeline;
+	VkPipelineLayout _gradientPipelineLayout;
 
 	//memory allocator
 	VmaAllocator _allocator;
@@ -72,6 +84,9 @@ private:
 	void init_swapchain();
 	void init_commands();
 	void init_sync_structures();
+	void init_descriptors();
+	void init_pipelines();
+	void init_background_pipelines();
 
 	void create_swapchain(uint32_t width, uint32_t height);
 	void destroy_swapchain();
