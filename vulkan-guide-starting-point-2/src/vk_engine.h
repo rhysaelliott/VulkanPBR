@@ -51,6 +51,11 @@ public:
 	//frame members
 	FrameData _frames[FRAME_OVERLAP];
 
+	//immediate submit members
+	VkFence _immFence;
+	VkCommandBuffer _immCommandBuffer;
+	VkCommandPool _immCommandPool;
+
 	//graphics members
 	VkQueue _graphicsQueue;
 	uint32_t _graphicsQueueFamily;
@@ -58,6 +63,10 @@ public:
 	//compute pipeline members
 	VkPipeline _gradientPipeline;
 	VkPipelineLayout _gradientPipelineLayout;
+
+	//background effect members
+	std::vector<ComputeEffect> backgroundEffects;
+	int currentBackgroundEffect{ 0 };
 
 	//memory allocator
 	VmaAllocator _allocator;
@@ -73,6 +82,10 @@ public:
 
 	void draw_background(VkCommandBuffer cmd);
 
+	void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
+
+	void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
+
 	//run main loop
 	void run();
 
@@ -87,6 +100,7 @@ private:
 	void init_descriptors();
 	void init_pipelines();
 	void init_background_pipelines();
+	void init_imgui();
 
 	void create_swapchain(uint32_t width, uint32_t height);
 	void destroy_swapchain();
