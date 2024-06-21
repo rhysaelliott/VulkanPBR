@@ -64,6 +64,10 @@ public:
 	VkPipeline _gradientPipeline;
 	VkPipelineLayout _gradientPipelineLayout;
 
+	//graphics pipeline members
+	VkPipelineLayout _trianglePipelineLayout;
+	VkPipeline _trianglePipeline;
+
 	//background effect members
 	std::vector<ComputeEffect> backgroundEffects;
 	int currentBackgroundEffect{ 0 };
@@ -81,6 +85,8 @@ public:
 	void draw();
 
 	void draw_background(VkCommandBuffer cmd);
+
+	void draw_geometry(VkCommandBuffer cmd);
 
 	void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
 
@@ -100,6 +106,7 @@ private:
 	void init_descriptors();
 	void init_pipelines();
 	void init_background_pipelines();
+	void init_triangle_pipeline();
 	void init_imgui();
 
 	void create_swapchain(uint32_t width, uint32_t height);
