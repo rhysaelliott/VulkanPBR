@@ -6,6 +6,7 @@
 #include <vk_types.h>
 #include <vk_descriptors.h>
 #include <vk_pipelines.h>
+#include <vk_loader.h>
 
 
 
@@ -40,6 +41,8 @@ public:
 
 	//draw resources
 	AllocatedImage _drawImage;
+	AllocatedImage _depthImage;
+
 	VkExtent2D _drawExtent;
 
 	//descriptor members
@@ -69,6 +72,8 @@ public:
 	VkPipeline _meshPipeline;
 
 	GPUMeshBuffers rectangle;
+
+	std::vector <std::shared_ptr<MeshAsset>> testMeshes;
 
 	//triangle pipeline members
 	VkPipelineLayout _trianglePipelineLayout;
@@ -104,6 +109,8 @@ public:
 	//frame member functions
 	FrameData& get_current_frame() { return _frames[_frameNumber % FRAME_OVERLAP]; };
 
+	GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+
 private:
 	void init_vulkan();
 	void init_swapchain();
@@ -112,7 +119,6 @@ private:
 	void init_descriptors();
 	void init_pipelines();
 	void init_background_pipelines();
-	void init_triangle_pipeline();
 	void init_mesh_pipeline();
 	void init_default_data();
 	void init_imgui();
@@ -123,5 +129,4 @@ private:
 	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 	void destroy_buffer(const AllocatedBuffer& buffer);
 
-	GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 };
