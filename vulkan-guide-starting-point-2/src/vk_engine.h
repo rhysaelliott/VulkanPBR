@@ -22,6 +22,7 @@ public:
 	VkExtent2D _windowExtent{ 1700 , 900 };
 
 	struct SDL_Window* _window{ nullptr };
+	bool resize_requested;
 
 	static VulkanEngine& Get();
 
@@ -44,6 +45,7 @@ public:
 	AllocatedImage _depthImage;
 
 	VkExtent2D _drawExtent;
+	float renderScale = 1.f;
 
 	//descriptor members
 	DescriptorAllocator globalDescriptorAllocator;
@@ -125,6 +127,7 @@ private:
 
 	void create_swapchain(uint32_t width, uint32_t height);
 	void destroy_swapchain();
+	void resize_swapchain();
 
 	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 	void destroy_buffer(const AllocatedBuffer& buffer);
