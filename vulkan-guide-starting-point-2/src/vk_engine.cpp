@@ -56,9 +56,9 @@ void VulkanEngine::init()
 
     init_descriptors();
     
-    init_default_data();
-
     init_pipelines();
+
+    init_default_data();
 
     init_imgui();
     // everything went fine
@@ -297,29 +297,6 @@ void VulkanEngine::init_pipelines()
 
     metalRoughMaterial.build_pipelines(this);
 
-    GLTFMetallic_Roughness::MaterialResources materialResources;
-
-    materialResources.colorImage = _whiteImage;
-    materialResources.colorSampler = _defaultSamplerLinear;
-    materialResources.metalRoughImage = _whiteImage;
-    materialResources.metalRoughSampler = _defaultSamplerLinear;
-
-    AllocatedBuffer materialConstants = 
-        create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-    GLTFMetallic_Roughness::MaterialConstants* sceneUniformData = (GLTFMetallic_Roughness::MaterialConstants*)materialConstants.allocation->GetMappedData();
-    sceneUniformData->colorFactors = glm::vec4(1, 1, 1, 1);
-    sceneUniformData->metalRoughFactors = glm::vec4(1, 0.5, 0, 0);
-
-    _mainDeletionQueue.push_function([=, this]()
-        {
-            destroy_buffer(materialConstants);
-        });
-
-    materialResources.dataBuffer = materialConstants.buffer;
-    materialResources.dataBufferOffset = 0;
-
-    defaultData = metalRoughMaterial.write_material(_device, MaterialPass::MainColor, materialResources, globalDescriptorAllocatorGrowable);
 }
 
 void VulkanEngine::init_background_pipelines()
@@ -513,6 +490,46 @@ void VulkanEngine::init_default_data()
         destroy_image(_errorCheckImage);
 
         });
+
+    GLTFMetallic_Roughness::MaterialResources materialResources;
+
+    materialResources.colorImage = _whiteImage;
+    materialResources.colorSampler = _defaultSamplerLinear;
+    materialResources.metalRoughImage = _whiteImage;
+    materialResources.metalRoughSampler = _defaultSamplerLinear;
+
+    AllocatedBuffer materialConstants =
+        create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+    GLTFMetallic_Roughness::MaterialConstants* sceneUniformData = (GLTFMetallic_Roughness::MaterialConstants*)materialConstants.allocation->GetMappedData();
+    sceneUniformData->colorFactors = glm::vec4(1, 1, 1, 1);
+    sceneUniformData->metalRoughFactors = glm::vec4(1, 0.5, 0, 0);
+
+    _mainDeletionQueue.push_function([=, this]()
+        {
+            destroy_buffer(materialConstants);
+        });
+
+    materialResources.dataBuffer = materialConstants.buffer;
+    materialResources.dataBufferOffset = 0;
+
+    defaultData = metalRoughMaterial.write_material(_device, MaterialPass::MainColor, materialResources, globalDescriptorAllocatorGrowable);
+
+    for (auto& m : testMeshes)
+    {
+        std::shared_ptr<MeshNode> newNode = std::make_shared<MeshNode>();
+        newNode->mesh = m;
+
+        newNode->localTransform = glm::mat4(1.f);
+        newNode->worldTransform = glm::mat4(1.f);
+
+        for (auto& s : newNode->mesh->surfaces)
+        {
+            s.material = std::make_shared<GLTFMaterial>(defaultData);
+        }
+
+        loadedNodes[m->name] = std::move(newNode);
+    }
 }
 
 void VulkanEngine::init_imgui()
@@ -789,10 +806,29 @@ AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat 
     return newImage;
 }
 
+void VulkanEngine::update_scene()
+{
+    mainDrawContext.OpaqueSurfaces.clear();
+
+    loadedNodes["Cube"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
+
+    sceneData.view = glm::translate(glm::vec3{ 0,0,-5 });
+
+    sceneData.proj = glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
+
+    sceneData.proj[1][1] *= -1;
+    sceneData.viewproj = sceneData.proj * sceneData.view;
+
+    sceneData.ambientColor = glm::vec4(.1f);
+    sceneData.sunlightColor = glm::vec4(1.f);
+    sceneData.sunlightDirection = glm::vec4(0,1,0.5,1.f);
+}
+
 void VulkanEngine::draw()
 {
-    //wait for gpu to render last frame
+    update_scene();
 
+    //wait for gpu to render last frame
     VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
 
     get_current_frame()._deletionQueue.flush();
@@ -956,22 +992,25 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(gpuSceneDataBuffer), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(_device, globalDescriptor);
 
-    GPUDrawPushConstants push_constants;
-    push_constants.worldMatrix = glm::mat4(1.f);
 
-    glm::mat4 view = glm::translate(glm::vec3{ 0,0,-5 });
-    glm::mat4 projection = glm::perspective(glm::radians(70.f), (float)_drawExtent.width / (float)_drawExtent.height, 10000.f, 0.1f);
 
-    projection[1][1] *= -1;
+    for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces)
+    {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
 
-    push_constants.worldMatrix = projection * view;
+        vkCmdBindIndexBuffer(cmd, draw.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    push_constants.vertexBuffer = testMeshes[2]->meshBuffers.vertexBufferAddress;
+        GPUDrawPushConstants pushConstants;
+        pushConstants.vertexBuffer = draw.vertexBufferAddress;
+        pushConstants.worldMatrix = draw.transform;
+        vkCmdPushConstants(cmd, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
 
-    vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &push_constants);
-    vkCmdBindIndexBuffer(cmd, testMeshes[2]->meshBuffers.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-    
-    vkCmdDrawIndexed(cmd, testMeshes[2]->surfaces[0].count, 1, testMeshes[2]->surfaces[0].startIndex, 0, 0);
+        vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
+    }
+
+
 
     vkCmdEndRendering(cmd);
 }
@@ -1199,7 +1238,7 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
 }
 void GLTFMetallic_Roughness::clear_resources(VkDevice device)
 {
-
+    //todo 
 }
 
 MaterialInstance GLTFMetallic_Roughness::write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator)
@@ -1225,4 +1264,25 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VkDevice device, Materia
     writer.update_set(device, matData.materialSet);
 
     return matData;
+}
+
+void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
+{
+    glm::mat4 nodeMatrix = topMatrix * worldTransform;
+
+    for (auto& s : mesh->surfaces)
+    {
+        RenderObject def;
+        def.indexCount = s.count;
+        def.firstIndex = s.startIndex;
+        def.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
+        def.material = &s.material->data;
+
+        def.transform = nodeMatrix;
+        def.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
+
+        ctx.OpaqueSurfaces.push_back(def);
+    }
+
+    Node::Draw(topMatrix, ctx);
 }

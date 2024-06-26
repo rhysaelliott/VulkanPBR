@@ -41,6 +41,22 @@ struct GLTFMetallic_Roughness
 	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator);
 };
 
+struct RenderObject
+{
+	uint32_t indexCount;
+	uint32_t firstIndex;
+	VkBuffer indexBuffer;
+
+	MaterialInstance* material;
+
+	glm::mat4 transform;
+	VkDeviceAddress vertexBufferAddress;
+};
+
+struct DrawContext
+{
+	std::vector<RenderObject> OpaqueSurfaces;
+};
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
@@ -57,6 +73,9 @@ public:
 	bool resize_requested;
 
 	static VulkanEngine& Get();
+
+	DrawContext mainDrawContext;
+	std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
 
 	//initialisation members
 	VkInstance _instance;
@@ -155,6 +174,8 @@ public:
 	void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
 
 	void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
+
+	void update_scene();
 
 	//run main loop
 	void run();
