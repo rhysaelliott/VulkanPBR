@@ -9,6 +9,38 @@
 #include <vk_loader.h>
 
 
+struct GLTFMetallic_Roughness
+{
+	MaterialPipeline opaquePipeline;
+	MaterialPipeline transparentPipeline;
+
+	VkDescriptorSetLayout materialLayout;
+
+	struct MaterialConstants
+	{
+		glm::vec4 colorFactors;
+		glm::vec4 metalRoughFactors;
+		glm::vec4 extra[14];
+	};
+	
+	struct MaterialResources
+	{
+		AllocatedImage colorImage;
+		VkSampler colorSampler;
+		AllocatedImage metalRoughImage;
+		VkSampler metalRoughSampler;
+		VkBuffer dataBuffer;
+		uint32_t dataBufferOffset;
+	};
+
+	DescriptorWriter writer;
+
+	void build_pipelines(VulkanEngine* engine);
+	void clear_resources(VkDevice device);
+
+	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator);
+};
+
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
@@ -49,6 +81,7 @@ public:
 
 	//descriptor members
 	DescriptorAllocator globalDescriptorAllocator;
+	DescriptorAllocatorGrowable globalDescriptorAllocatorGrowable;
 
 	VkDescriptorSet _drawImageDescriptors;
 	VkDescriptorSetLayout _drawImageDescriptorLayout;
@@ -63,6 +96,9 @@ public:
 	AllocatedImage _errorCheckImage;
 
 	VkDescriptorSetLayout _singleImageDescriptorLayout;
+
+	MaterialInstance defaultData;
+	GLTFMetallic_Roughness metalRoughMaterial;
 
 	//image samplers
 	VkSampler _defaultSamplerLinear;
