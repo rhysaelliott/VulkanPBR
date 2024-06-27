@@ -60,6 +60,8 @@ void VulkanEngine::init()
 
     init_default_data();
 
+
+
     init_imgui();
     // everything went fine
     _isInitialized = true;
@@ -810,7 +812,7 @@ void VulkanEngine::update_scene()
 {
     mainDrawContext.OpaqueSurfaces.clear();
 
-    loadedNodes["Cube"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
+    loadedNodes["Suzanne"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
 
     sceneData.view = glm::translate(glm::vec3{ 0,0,-5 });
 
@@ -979,19 +981,14 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     AllocatedBuffer gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-    get_current_frame()._deletionQueue.push_function([=, this]() {
-        destroy_buffer(gpuSceneDataBuffer);
-        });
-
     GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
     *sceneUniformData = sceneData;
 
     VkDescriptorSet globalDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
 
     DescriptorWriter writer;
-    writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(gpuSceneDataBuffer), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(sceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(_device, globalDescriptor);
-
 
 
     for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces)
@@ -1010,7 +1007,9 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
         vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
     }
 
-
+    get_current_frame()._deletionQueue.push_function([=, this]() {
+        destroy_buffer(gpuSceneDataBuffer);
+        });
 
     vkCmdEndRendering(cmd);
 }
