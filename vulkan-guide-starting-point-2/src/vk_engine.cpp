@@ -45,6 +45,8 @@ void VulkanEngine::init()
         _windowExtent.width,
         _windowExtent.height,
         window_flags);
+
+    SDL_SetRelativeMouseMode(SDL_TRUE);
     
     init_vulkan();
 
@@ -1073,6 +1075,14 @@ void VulkanEngine::run()
             // close the window when user alt-f4s or clicks the X button
             if (e.type == SDL_QUIT)
                 bQuit = true;
+
+            if (e.type == SDL_KEYDOWN)
+            {
+                if (e.key.keysym.sym == SDLK_ESCAPE)
+                {
+                    bQuit = true;
+                }
+            }
 
             mainCamera.processSDLEvent(e);
             ImGui_ImplSDL2_ProcessEvent(&e);

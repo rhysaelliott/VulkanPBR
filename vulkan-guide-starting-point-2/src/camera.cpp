@@ -25,6 +25,8 @@ void Camera::processSDLEvent(SDL_Event& e)
 		if (e.key.keysym.sym == SDLK_s) { velocity.z = 1; }
 		if (e.key.keysym.sym == SDLK_a) { velocity.x = -1; }
 		if (e.key.keysym.sym == SDLK_d) { velocity.x = 1; }
+		if (e.key.keysym.sym == SDLK_q) { velocity.y = -1; }
+		if (e.key.keysym.sym == SDLK_e) { velocity.y = 1; }
 	}
 	if (e.type == SDL_KEYUP)
 	{
@@ -32,6 +34,8 @@ void Camera::processSDLEvent(SDL_Event& e)
 		if (e.key.keysym.sym == SDLK_s) { velocity.z = 0; }
 		if (e.key.keysym.sym == SDLK_a) { velocity.x = 0; }
 		if (e.key.keysym.sym == SDLK_d) { velocity.x = 0; }
+		if (e.key.keysym.sym == SDLK_q) { velocity.y  = 0; }
+		if (e.key.keysym.sym == SDLK_e) { velocity.y = 0; }
 	}
 
 	if (e.type == SDL_MOUSEMOTION)
@@ -44,5 +48,6 @@ void Camera::processSDLEvent(SDL_Event& e)
 void Camera::update()
 {
 	glm::mat4 cameraRotation = getRotationMatrix();
-	position += glm::vec3(cameraRotation * glm::vec4(velocity * 0.5f, 0.f));
+	position += glm::vec3(cameraRotation * glm::vec4(velocity * 0.1f, 0.f));
+
 }
