@@ -7,6 +7,7 @@
 #include <vk_descriptors.h>
 #include <vk_pipelines.h>
 #include <vk_loader.h>
+#include <camera.h>
 
 
 struct GLTFMetallic_Roughness
@@ -76,6 +77,8 @@ public:
 
 	DrawContext mainDrawContext;
 	std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
+
+	Camera mainCamera;
 
 	//initialisation members
 	VkInstance _instance;
