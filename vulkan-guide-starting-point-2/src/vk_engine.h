@@ -57,6 +57,7 @@ struct RenderObject
 struct DrawContext
 {
 	std::vector<RenderObject> OpaqueSurfaces;
+	std::vector<RenderObject> TransparentSurfaces;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -120,7 +121,6 @@ public:
 
 	VkDescriptorSetLayout _singleImageDescriptorLayout;
 
-	MaterialInstance defaultData;
 	GLTFMetallic_Roughness metalRoughMaterial;
 
 	//image samplers
