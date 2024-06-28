@@ -1,6 +1,9 @@
 ﻿#pragma once
 
-#include <vk_types.h>
+#include <vector>
+#include <span>
+#include <deque>
+#include <vulkan/vulkan.h>
 
 struct DescriptorLayoutBuilder
 {
@@ -67,14 +70,3 @@ struct DescriptorWriter
 };
 
 
-struct FrameData
-{
-	VkCommandPool _commandPool;
-	VkCommandBuffer _mainCommandBuffer;
-
-	VkSemaphore _swapchainSemaphore, _renderSemaphore;
-	VkFence _renderFence;
-
-	DelectionQueue _deletionQueue;
-	DescriptorAllocatorGrowable _frameDescriptors;
-};

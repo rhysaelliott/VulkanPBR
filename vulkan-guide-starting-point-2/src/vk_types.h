@@ -19,7 +19,7 @@
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
-
+#include <vk_descriptors.h>
 
 
 #define VK_CHECK(x)                                                     \
@@ -30,6 +30,13 @@
 			abort();                                                    \
 		}                                                               \
 	} while (0)
+
+//forward declares
+struct MeshAsset;
+struct GLTFMaterial;
+class VulkanEngine;
+struct DescriptorAllocatorGrowable;
+struct DrawContext;
 
 struct DelectionQueue
 {
@@ -107,6 +114,18 @@ struct GPUDrawPushConstants
 	VkDeviceAddress vertexBuffer;
 };
 
+struct FrameData
+{
+	VkCommandPool _commandPool;
+	VkCommandBuffer _mainCommandBuffer;
+
+	VkSemaphore _swapchainSemaphore, _renderSemaphore;
+	VkFence _renderFence;
+
+	DelectionQueue _deletionQueue;
+	DescriptorAllocatorGrowable _frameDescriptors;
+};
+
 struct GPUSceneData
 {
 	glm::mat4 view;
@@ -136,8 +155,6 @@ struct MaterialInstance
 	VkDescriptorSet materialSet;
 	MaterialPass passType;
 };
-
-struct DrawContext;
 
 class IRenderable
 {
@@ -171,7 +188,6 @@ struct Node : public IRenderable
 	}
 };
 
-struct MeshAsset;
 
 struct MeshNode : public Node {
 
@@ -179,3 +195,5 @@ struct MeshNode : public Node {
 
 	virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
 };
+
+

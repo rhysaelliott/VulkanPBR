@@ -65,6 +65,14 @@ void VulkanEngine::init()
 
 
     init_imgui();
+
+    std::string structurePath = { "..\\..\\assets\\structure.glb" };
+    auto structureFile = loadGltf(this, structurePath);
+
+    assert(structureFile.has_value());
+
+    loadedScenes["structure"] = *structureFile;
+
     // everything went fine
     _isInitialized = true;
 }
@@ -448,7 +456,6 @@ void VulkanEngine::init_mesh_pipeline()
 
 void VulkanEngine::init_default_data()
 {
-    testMeshes = load_gltf_meshes(this, "..\\..\\assets\\basicmesh.glb").value();
 
     //load default textures
     uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
@@ -536,7 +543,7 @@ void VulkanEngine::init_default_data()
     }
 
     mainCamera.velocity = glm::vec3(0.f);
-    mainCamera.position = glm::vec3(0, 0, 5);
+    mainCamera.position = glm::vec3(30.f, -0.f, -85.f);
 
     mainCamera.pitch = 0;
     mainCamera.yaw = 0;
@@ -820,7 +827,9 @@ void VulkanEngine::update_scene()
 {
     mainDrawContext.OpaqueSurfaces.clear();
 
-    loadedNodes["Suzanne"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
+    //loadedNodes["Suzanne"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
+
+    loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
 
     mainCamera.update();
     sceneData.view = mainCamera.getViewMatrix();
@@ -1082,6 +1091,17 @@ void VulkanEngine::run()
                 {
                     bQuit = true;
                 }
+                if (e.key.keysym.sym == SDLK_1)
+                {
+                    if (SDL_GetRelativeMouseMode() == SDL_TRUE)
+                    {
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                    }
+                    else
+                    {
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                    }
+                }
             }
 
             mainCamera.processSDLEvent(e);
@@ -1149,6 +1169,7 @@ void VulkanEngine::cleanup()
 
         vkDeviceWaitIdle(_device);
 
+        loadedScenes.clear();
 
 
         for (int i = 0; i < FRAME_OVERLAP; i++)
