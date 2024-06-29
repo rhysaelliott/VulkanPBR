@@ -972,7 +972,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     for (auto r : mainDrawContext.OpaqueSurfaces)
     {
-        draw(r);
+          draw(r);
     }
     for (auto r : mainDrawContext.TransparentSurfaces)
     {
@@ -1273,7 +1273,15 @@ void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
         def.transform = nodeMatrix;
         def.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
 
-        ctx.OpaqueSurfaces.push_back(def);
+        if (s.material->data.passType == MaterialPass::MainColor)
+        {
+            ctx.OpaqueSurfaces.push_back(def);
+        }
+        else if (s.material->data.passType == MaterialPass::Transparent)
+        {
+            ctx.TransparentSurfaces.push_back(def);
+        }
+ 
     }
 
     Node::Draw(topMatrix, ctx);
