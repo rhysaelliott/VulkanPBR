@@ -382,6 +382,9 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 			{
 				newSurface.material = materials[0];
 			}
+			//todo work out bounding box
+
+
 
 			newMesh->surfaces.push_back(newSurface);
 		}
@@ -427,6 +430,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 
 			} }, node.transform);
 	}
+
 
 	for (int i = 0; i < gltf.nodes.size(); i++)
 	{

@@ -49,7 +49,7 @@ struct RenderObject
 	VkBuffer indexBuffer;
 
 	MaterialInstance* material;
-
+	Bounds bounds;
 	glm::mat4 transform;
 	VkDeviceAddress vertexBufferAddress;
 };
@@ -59,6 +59,15 @@ struct DrawContext
 
 	std::vector<RenderObject> OpaqueSurfaces;
 	std::vector<RenderObject> TransparentSurfaces;
+};
+
+struct EngineStats
+{
+	float frametime;
+	int triangleCount;
+	int drawcallCount;
+	float sceneUpdateTime;
+	float meshDrawTime;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -82,6 +91,8 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
 
 	Camera mainCamera;
+
+	EngineStats stats;
 
 	//initialisation members
 	VkInstance _instance;
