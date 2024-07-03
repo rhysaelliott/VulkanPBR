@@ -24,7 +24,7 @@
 
 VulkanEngine* loadedEngine = nullptr;
 
-constexpr bool bUseValidationLayers = false;
+constexpr bool bUseValidationLayers = true;
 
 bool is_visible(const RenderObject& obj, const glm::mat4& viewproj)
 {
@@ -67,6 +67,19 @@ bool is_visible(const RenderObject& obj, const glm::mat4& viewproj)
         return true;
     }
 }
+bool is_light_affecting_object(const LightStruct& light, const RenderObject& obj)
+{
+    //todo expand on this
+    float distance = glm::length(light.position - obj.bounds.origin);
+    float boundsExtent = glm::length(obj.bounds.extents);
+    if (distance > light.range + boundsExtent)
+    {
+        return false;
+    }
+    
+    return true;
+}
+
 VulkanEngine& VulkanEngine::Get() { return *loadedEngine; }
 void VulkanEngine::init()
 {
@@ -329,7 +342,7 @@ void VulkanEngine::init_descriptors()
     {
         DescriptorLayoutBuilder builder;
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        _gpuLightDataDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+        _gpuLightDataDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_FRAGMENT_BIT);
     }
 
     {
@@ -553,6 +566,13 @@ void VulkanEngine::init_default_data()
 
     mainCamera.pitch = 0;
     mainCamera.yaw = 0;
+
+    LightStruct light1 = {};
+    light1.color = glm::vec3 (1.5f, 0.f, 0.f);
+    light1.position = glm::vec3(30.f, -0, -85.f);
+    light1.range = 15.f;
+
+    sceneLights.push_back(light1);
 }
 
 void VulkanEngine::init_imgui()
@@ -1025,16 +1045,8 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(sceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(_device, globalDescriptor);
 
-
-
-    //handle light data
-    lightData.lights[0].color = glm::vec3(1.f, 0.f, 0.f);
-
-    //todo sort light buffer
-    
     AllocatedBuffer gpuLightBuffer = create_buffer(sizeof(LightBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
     LightBuffer* lightBufferData = (LightBuffer*)gpuLightBuffer.allocation->GetMappedData();
-    *lightBufferData = lightData;
 
     VkDescriptorSet lightDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _gpuLightDataDescriptorLayout);
     writer.write_buffer(0, gpuLightBuffer.buffer, sizeof(lightData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
@@ -1049,9 +1061,11 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     MaterialPipeline* lastPipeline = nullptr;
     MaterialInstance* lastMaterial = nullptr;
     VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
+    LightBuffer lastLightData{};
 
     auto draw = [&](const RenderObject& draw)
         {
+
             if (draw.material != lastMaterial)
             {
                 lastMaterial = draw.material;
@@ -1090,7 +1104,32 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
             }
 
 
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
+            //handle light data
+            //todo sort light buffer
+            //todo clear light data
+            std::fill(std::begin(lightData.lights), std::end(lightData.lights), LightStruct{});
+            lightData.numLights = 0;
+
+            for (const auto& l : sceneLights)
+            {
+                //if (is_light_affecting_object(l, draw) == true)
+                {
+                    if (lightData.numLights < 10)
+                    {
+                        lightData.lights[lightData.numLights++] = l;
+                    }
+                }
+            }
+
+            //todo 
+            //if (lightData.lights != lastLightData)
+            {
+                *lightBufferData = lightData;
+
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
+            }
+
+
             GPUDrawPushConstants pushConstants;
             pushConstants.vertexBuffer = draw.vertexBufferAddress;
             pushConstants.worldMatrix = draw.transform;

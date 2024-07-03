@@ -56,6 +56,11 @@ struct LightStruct
 	float linear;
 	float quadratic;
 	LightType lightType;
+
+	LightStruct()
+		: position(glm::vec3(0)), lightType(LightType::PointLight), color(glm::vec3(0)), cone(0.0f),
+		direction(glm::vec3(0)), range(0.0f), intensity(0.0f), constant(0.0f),
+		linear(0.0f), quadratic(0.0f) {}
 };
 
 struct DelectionQueue

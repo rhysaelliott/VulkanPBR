@@ -56,7 +56,7 @@ void vkutil::generate_mipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D ima
 		VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		imageBarrier.subresourceRange = vkinit::image_subresource_range(aspectMask);
 		imageBarrier.subresourceRange.levelCount = 1;
-		imageBarrier.subresourceRange.layerCount = mip;
+		imageBarrier.subresourceRange.baseMipLevel = mip;
 		imageBarrier.image = image;
 
 		VkDependencyInfo depInfo = {.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO, .pNext = nullptr};
