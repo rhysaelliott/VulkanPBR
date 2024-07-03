@@ -38,6 +38,26 @@ class VulkanEngine;
 struct DescriptorAllocatorGrowable;
 struct DrawContext;
 
+enum LightType
+{
+	PointLight,
+	SpotLight
+};
+
+struct LightStruct
+{
+	glm::vec3 position;
+	float cone;
+	glm::vec3 color;
+	float range;
+	glm::vec3 direction;
+	float intensity;
+	float constant;
+	float linear;
+	float quadratic;
+	LightType lightType;
+};
+
 struct DelectionQueue
 {
 	std::deque<std::function<void()>> deletors;
@@ -134,6 +154,12 @@ struct GPUSceneData
 	glm::vec4 ambientColor;
 	glm::vec4 sunlightDirection;
 	glm::vec4 sunlightColor;
+};
+
+struct LightBuffer
+{
+	LightStruct lights[10];
+	int numLights;
 };
 
 enum class MaterialPass : uint8_t

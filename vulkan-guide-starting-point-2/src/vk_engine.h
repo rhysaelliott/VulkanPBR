@@ -16,6 +16,7 @@ struct GLTFMetallic_Roughness
 	MaterialPipeline transparentPipeline;
 
 	VkDescriptorSetLayout materialLayout;
+	VkDescriptorSetLayout lightLayout;
 
 	struct MaterialConstants
 	{
@@ -124,6 +125,9 @@ public:
 
 	GPUSceneData sceneData;
 	VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
+	LightBuffer lightData;
+	std::vector<LightStruct> sceneLights;
+	VkDescriptorSetLayout _gpuLightDataDescriptorLayout;
 
 	//temporary textures
 	AllocatedImage _whiteImage;

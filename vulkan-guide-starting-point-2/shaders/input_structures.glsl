@@ -16,5 +16,25 @@ layout(set=1, binding=0) uniform GLTFMaterialData
 	vec4 metalRoughFactors;
 } materialData;
 
+struct LightStruct
+{
+    vec3 position;
+    float cone;         
+    vec3 color;
+    float range;        
+    vec3 direction;
+    float intensity;   
+    float constant;
+    float linear;
+    float quadratic;
+    uint lightType; 
+};
+
+layout(set=2, binding=0) uniform LightData
+{
+	LightStruct lights[10];
+	int numLights;
+} lightData;
+
 layout(set =1, binding =1) uniform sampler2D colorTex;
 layout(set =1, binding =2) uniform sampler2D metalRoughTex;

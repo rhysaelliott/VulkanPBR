@@ -328,6 +328,12 @@ void VulkanEngine::init_descriptors()
 
     {
         DescriptorLayoutBuilder builder;
+        builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        _gpuLightDataDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    }
+
+    {
+        DescriptorLayoutBuilder builder;
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
         _singleImageDescriptorLayout = builder.build(_device,VK_SHADER_STAGE_FRAGMENT_BIT);
     }
@@ -1007,6 +1013,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
         vkinit::rendering_info(_drawExtent, &colorAttachment, &depthAttachment);
     vkCmdBeginRendering(cmd, &renderInfo);
 
+    //handle scene data
     AllocatedBuffer gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
     GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
@@ -1017,6 +1024,21 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     DescriptorWriter writer;
     writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(sceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(_device, globalDescriptor);
+
+
+
+    //handle light data
+    lightData.lights[0].color = glm::vec3(1.f, 0.f, 0.f);
+
+    //todo sort light buffer
+    
+    AllocatedBuffer gpuLightBuffer = create_buffer(sizeof(LightBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    LightBuffer* lightBufferData = (LightBuffer*)gpuLightBuffer.allocation->GetMappedData();
+    *lightBufferData = lightData;
+
+    VkDescriptorSet lightDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _gpuLightDataDescriptorLayout);
+    writer.write_buffer(0, gpuLightBuffer.buffer, sizeof(lightData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.update_set(_device, lightDescriptor);
 
     //reset counters
     stats.drawcallCount = 0;
@@ -1067,6 +1089,8 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                 vkCmdBindIndexBuffer(cmd, draw.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
             }
 
+
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
             GPUDrawPushConstants pushConstants;
             pushConstants.vertexBuffer = draw.vertexBufferAddress;
             pushConstants.worldMatrix = draw.transform;
@@ -1089,6 +1113,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
         destroy_buffer(gpuSceneDataBuffer);
+        destroy_buffer(gpuLightBuffer);
         });
 
 
@@ -1322,13 +1347,14 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
     layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     layoutBuilder.add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    layoutBuilder.add_binding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
     materialLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkDescriptorSetLayout layouts[] = { engine->_gpuSceneDataDescriptorLayout, materialLayout };
+    VkDescriptorSetLayout layouts[] = { engine->_gpuSceneDataDescriptorLayout, materialLayout, engine->_gpuLightDataDescriptorLayout };
 
     VkPipelineLayoutCreateInfo meshLayoutInfo = vkinit::pipeline_layout_create_info();
-    meshLayoutInfo.setLayoutCount = 2;
+    meshLayoutInfo.setLayoutCount = 3;
     meshLayoutInfo.pSetLayouts = layouts;
     meshLayoutInfo.pPushConstantRanges = &bufferRange;
     meshLayoutInfo.pushConstantRangeCount = 1;
