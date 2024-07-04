@@ -356,6 +356,8 @@ void VulkanEngine::init_descriptors()
             globalDescriptorAllocator.destroy_pool(_device);
 
             vkDestroyDescriptorSetLayout(_device, _drawImageDescriptorLayout, nullptr);
+            vkDestroyDescriptorSetLayout(_device, _gpuLightDataDescriptorLayout, nullptr);
+            vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
         });
 }
 
@@ -571,8 +573,22 @@ void VulkanEngine::init_default_data()
     light1.color = glm::vec3 (1.5f, 0.f, 0.f);
     light1.position = glm::vec3(30.f, -0, -85.f);
     light1.range = 15.f;
+    light1.constant = 1.0f;
+    light1.linear = 0.1f;
+    light1.quadratic = 0.1f;
+    light1.intensity = 10;
+
+    LightStruct light2 = {};
+    light2.color = glm::vec3(0.0f, 0.0f, 1.0f);
+    light2.position = glm::vec3(20.f, -0, -85.f);
+    light2.range = 15.f;
+    light2.constant = 1.0f;
+    light2.linear = 0.1f;
+    light2.quadratic = 0.1f;
+    light2.intensity = 10;
 
     sceneLights.push_back(light1);
+    sceneLights.push_back(light2);
 }
 
 void VulkanEngine::init_imgui()
@@ -1326,7 +1342,6 @@ void VulkanEngine::cleanup()
 
         loadedScenes.clear();
 
-
         for (int i = 0; i < FRAME_OVERLAP; i++)
         {
             vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
@@ -1343,6 +1358,8 @@ void VulkanEngine::cleanup()
             destroy_buffer(mesh->meshBuffers.indexBuffer);
             destroy_buffer(mesh->meshBuffers.vertexBuffer);
         }
+
+        metalRoughMaterial.clear_resources(_device);
 
         _mainDeletionQueue.flush();
 
@@ -1432,7 +1449,12 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
 }
 void GLTFMetallic_Roughness::clear_resources(VkDevice device)
 {
-    //todo 
+    vkDestroyDescriptorSetLayout(device, materialLayout, nullptr);
+    vkDestroyDescriptorSetLayout(device, lightLayout, nullptr);
+    vkDestroyPipelineLayout(device, transparentPipeline.layout, nullptr);
+
+    vkDestroyPipeline(device, transparentPipeline.pipeline, nullptr);
+    vkDestroyPipeline(device, opaquePipeline.pipeline, nullptr);
 }
 
 MaterialInstance GLTFMetallic_Roughness::write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator)
