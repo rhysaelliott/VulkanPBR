@@ -356,6 +356,7 @@ void VulkanEngine::init_descriptors()
             globalDescriptorAllocator.destroy_pool(_device);
 
             vkDestroyDescriptorSetLayout(_device, _drawImageDescriptorLayout, nullptr);
+            vkDestroyDescriptorSetLayout(_device, _singleImageDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _gpuLightDataDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
         });
@@ -1450,11 +1451,11 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
 void GLTFMetallic_Roughness::clear_resources(VkDevice device)
 {
     vkDestroyDescriptorSetLayout(device, materialLayout, nullptr);
-    vkDestroyDescriptorSetLayout(device, lightLayout, nullptr);
     vkDestroyPipelineLayout(device, transparentPipeline.layout, nullptr);
 
     vkDestroyPipeline(device, transparentPipeline.pipeline, nullptr);
     vkDestroyPipeline(device, opaquePipeline.pipeline, nullptr);
+
 }
 
 MaterialInstance GLTFMetallic_Roughness::write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator)

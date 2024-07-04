@@ -16,7 +16,6 @@ struct GLTFMetallic_Roughness
 	MaterialPipeline transparentPipeline;
 
 	VkDescriptorSetLayout materialLayout;
-	VkDescriptorSetLayout lightLayout;
 
 	struct MaterialConstants
 	{
