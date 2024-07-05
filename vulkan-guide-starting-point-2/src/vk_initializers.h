@@ -30,6 +30,9 @@ VkRenderingAttachmentInfo depth_attachment_info(VkImageView view,
 VkRenderingInfo rendering_info(VkExtent2D renderExtent, VkRenderingAttachmentInfo* colorAttachment,
     VkRenderingAttachmentInfo* depthAttachment);
 
+VkRenderingInfo shadow_rendering_info(VkExtent2D renderExtent,
+    VkRenderingAttachmentInfo* depthAttachment);
+
 VkImageSubresourceRange image_subresource_range(VkImageAspectFlags aspectMask);
 
 VkSemaphoreSubmitInfo semaphore_submit_info(VkPipelineStageFlags2 stageMask, VkSemaphore semaphore);

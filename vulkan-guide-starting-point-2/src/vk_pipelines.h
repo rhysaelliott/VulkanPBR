@@ -17,6 +17,7 @@ public:
 	VkPipelineMultisampleStateCreateInfo _multisampling;
 	VkPipelineLayout _pipelineLayout;
 	VkPipelineDepthStencilStateCreateInfo _depthStencil;
+	VkPipelineColorBlendStateCreateInfo _colorBlending;
 	VkPipelineRenderingCreateInfo _renderInfo;
 	VkFormat _colorAttachmentFormat;
 
@@ -34,6 +35,8 @@ public:
 	void set_depth_format(VkFormat format);
 	void disable_depthtest();
 	void enable_depthtest(bool depthWriteEnable, VkCompareOp op);
+	void disable_colorblending();
+	void enable_colorblending();
 
 	void clear();
 

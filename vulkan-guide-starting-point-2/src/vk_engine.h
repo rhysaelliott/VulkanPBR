@@ -111,6 +111,7 @@ public:
 	//draw resources
 	AllocatedImage _drawImage;
 	AllocatedImage _depthImage;
+	AllocatedImage _shadowImage;
 
 	VkExtent2D _drawExtent;
 	float renderScale = 1.f;
@@ -185,6 +186,8 @@ public:
 
 	//draw loop
 	void draw();
+
+	void draw_shadows(VkCommandBuffer cmd);
 
 	void draw_background(VkCommandBuffer cmd);
 

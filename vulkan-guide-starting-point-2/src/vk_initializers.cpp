@@ -175,6 +175,21 @@ VkRenderingInfo vkinit::rendering_info(VkExtent2D renderExtent, VkRenderingAttac
 
     return renderInfo;
 }
+VkRenderingInfo vkinit::shadow_rendering_info(VkExtent2D renderExtent,
+    VkRenderingAttachmentInfo* depthAttachment)
+{
+    VkRenderingInfo renderInfo{};
+    renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderInfo.pNext = nullptr;
+
+    renderInfo.renderArea = VkRect2D{ VkOffset2D { 0, 0 }, renderExtent };
+    renderInfo.layerCount = 1;
+    renderInfo.colorAttachmentCount = 0;
+    renderInfo.pDepthAttachment = depthAttachment;
+    renderInfo.pStencilAttachment = nullptr;
+
+    return renderInfo;
+}
 //< render_info
 //> subresource
 VkImageSubresourceRange vkinit::image_subresource_range(VkImageAspectFlags aspectMask)

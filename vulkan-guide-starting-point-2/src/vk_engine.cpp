@@ -248,6 +248,23 @@ void VulkanEngine::init_swapchain()
 
     VK_CHECK(vkCreateImageView(_device, &dviewInfo, nullptr, &_depthImage.imageView));
 
+    //create shadow image
+    _shadowImage.imageFormat = VK_FORMAT_D32_SFLOAT;
+    _shadowImage.imageExtent = drawImageExtent;
+    VkImageUsageFlags shadowImageUsage{};
+    shadowImageUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    shadowImageUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    VkImageCreateInfo simgInfo =
+        vkinit::image_create_info(_shadowImage.imageFormat, shadowImageUsage, drawImageExtent);
+
+    vmaCreateImage(_allocator, &simgInfo, &rimg_allocInfo, &_shadowImage.image, &_shadowImage.allocation, nullptr);
+
+    VkImageViewCreateInfo sviewInfo =
+        vkinit::imageview_create_info(_shadowImage.imageFormat, _shadowImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    VK_CHECK(vkCreateImageView(_device, &sviewInfo, nullptr, &_shadowImage.imageView));
+
     _mainDeletionQueue.push_function([=]()
         {
             vkDestroyImageView(_device, _drawImage.imageView, nullptr);
@@ -255,6 +272,9 @@ void VulkanEngine::init_swapchain()
 
             vkDestroyImageView(_device, _depthImage.imageView, nullptr);
             vmaDestroyImage(_allocator, _depthImage.image, _depthImage.allocation);
+
+            vkDestroyImageView(_device, _shadowImage.imageView, nullptr);
+            vmaDestroyImage(_allocator, _shadowImage.image, _shadowImage.allocation);
         });
 }
 
@@ -938,6 +958,12 @@ void VulkanEngine::draw()
     //record to command buffer
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
+    vkutil::transition_image(cmd, _shadowImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+    draw_shadows(cmd);
+
+    vkutil::transition_image(cmd, _shadowImage.image, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     draw_background(cmd);
@@ -992,6 +1018,40 @@ void VulkanEngine::draw()
     }
 
     _frameNumber++;
+}
+
+void VulkanEngine::draw_shadows(VkCommandBuffer cmd)
+{
+    VkRenderingAttachmentInfo depthAttachment =
+        vkinit::depth_attachment_info(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+    VkRenderingInfo renderInfo =
+        vkinit::shadow_rendering_info(VkExtent2D(_shadowImage.imageExtent.width, _shadowImage.imageExtent.height), &depthAttachment);
+    vkCmdBeginRendering(cmd, &renderInfo);
+
+    VkViewport viewport = {};
+    viewport.x = 0;
+    viewport.y = 0;
+    viewport.width = _shadowImage.imageExtent.width;
+    viewport.height = _shadowImage.imageExtent.height;
+    viewport.minDepth = 0.f;
+    viewport.maxDepth = 1.f;
+    
+
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor = {};
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    scissor.extent.width = _shadowImage.imageExtent.width;
+    scissor.extent.height = _shadowImage.imageExtent.height;
+
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    //draw opaque objects from light pov
+
+
+    vkCmdEndRendering(cmd);
 }
 
 void VulkanEngine::draw_background(VkCommandBuffer cmd)

@@ -165,7 +165,6 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device)
 	viewportState.viewportCount = 1;
 	viewportState.scissorCount = 1;
 
-	//setup color blending TODO: setup transparency
 	VkPipelineColorBlendStateCreateInfo colorBlending = { };
 	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlending.pNext = nullptr;
