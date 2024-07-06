@@ -520,7 +520,7 @@ void VulkanEngine::init_mesh_pipeline()
     pipelineBuilder.enable_blending_alphablend();
     //pipelineBuilder.disable_depthtest();
     pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
-
+    pipelineBuilder.enable_colorblending();
     pipelineBuilder.set_color_attachment_format(_drawImage.imageFormat);
     pipelineBuilder.set_depth_format(_depthImage.imageFormat);
 
@@ -918,6 +918,8 @@ void VulkanEngine::update_scene()
     sceneData.sunlightColor = glm::vec4(1.f);
     sceneData.sunlightDirection = glm::vec4(0,1,0.5,1.f);
 
+    sort_opaque_draws();
+
     auto end = std::chrono::system_clock::now();
 
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
@@ -1029,6 +1031,8 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd)
         vkinit::shadow_rendering_info(VkExtent2D(_shadowImage.imageExtent.width, _shadowImage.imageExtent.height), &depthAttachment);
     vkCmdBeginRendering(cmd, &renderInfo);
 
+    //todo write light render buffer
+
     VkViewport viewport = {};
     viewport.x = 0;
     viewport.y = 0;
@@ -1048,8 +1052,30 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd)
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    //draw opaque objects from light pov
 
+
+    auto draw = [&](const RenderObject& draw)
+        {
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->shadowPipeline->pipeline);
+
+            vkCmdBindIndexBuffer(cmd, draw.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+            GPUShadowDrawPushConstants pushConstants;
+            pushConstants.vertexBuffer = draw.vertexBufferAddress;
+            //todo sort view proj
+            pushConstants.lightViewProj = draw.transform;
+            pushConstants.worldMatrix = draw.transform;
+
+            vkCmdPushConstants(cmd, draw.material->shadowPipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUShadowDrawPushConstants), &pushConstants);
+
+            vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
+        };
+
+
+    for (auto r : opaqueDraws)
+    {
+        draw(mainDrawContext.OpaqueSurfaces[r]);
+    }
 
     vkCmdEndRendering(cmd);
 }
@@ -1073,9 +1099,9 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
     vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16.0), std::ceil(_drawExtent.height / 16.0), 1);
 }
 
-void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
+void VulkanEngine::sort_opaque_draws()
 {
-    std::vector<uint32_t> opaqueDraws;
+    opaqueDraws.clear();
     opaqueDraws.reserve(mainDrawContext.OpaqueSurfaces.size());
 
     for (uint32_t i = 0; i < mainDrawContext.OpaqueSurfaces.size(); i++)
@@ -1098,7 +1124,11 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
             {
                 return A.material < B.material;
             }
-            });
+        });
+}
+
+void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
+{
 
     VkRenderingAttachmentInfo colorAttachment =
         vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -1454,11 +1484,21 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
     {
         fmt::print("Error when building the mesh vertex shader module \n");
     }
+    VkShaderModule shadowVertexShader;
+    if (!vkutil::load_shader_module("../../shaders/shadows.vert.spv", engine->_device, &shadowVertexShader))
+    {
+        fmt::print("Error when building the shadow vertex shader module \n");
+    }
 
     VkPushConstantRange bufferRange{};
     bufferRange.offset = 0;
     bufferRange.size = sizeof(GPUDrawPushConstants);
     bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkPushConstantRange shadowBufferRange{};
+    shadowBufferRange.offset = 0;
+    shadowBufferRange.size = sizeof(GPUShadowDrawPushConstants);
+    shadowBufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     DescriptorLayoutBuilder layoutBuilder;
     layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
@@ -1467,6 +1507,7 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
     layoutBuilder.add_binding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
     materialLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    shadowLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
 
     VkDescriptorSetLayout layouts[] = { engine->_gpuSceneDataDescriptorLayout, materialLayout, engine->_gpuLightDataDescriptorLayout };
 
@@ -1476,11 +1517,22 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
     meshLayoutInfo.pPushConstantRanges = &bufferRange;
     meshLayoutInfo.pushConstantRangeCount = 1;
 
+    VkPipelineLayoutCreateInfo shadowLayoutInfo = vkinit::pipeline_layout_create_info();
+    shadowLayoutInfo.setLayoutCount = 0;
+    shadowLayoutInfo.pSetLayouts = nullptr;
+    shadowLayoutInfo.pPushConstantRanges = &shadowBufferRange;
+    shadowLayoutInfo.pushConstantRangeCount = 1;
+
     VkPipelineLayout newLayout;
     VK_CHECK(vkCreatePipelineLayout(engine->_device, &meshLayoutInfo, nullptr, &newLayout));
 
     opaquePipeline.layout = newLayout;
     transparentPipeline.layout = newLayout;
+    
+    //todo create shadow layout
+    VkPipelineLayout shadowLayout;
+    VK_CHECK(vkCreatePipelineLayout(engine->_device, &shadowLayoutInfo, nullptr, &shadowLayout));
+    shadowPipeline.layout = shadowLayout;
 
     PipelineBuilder pipelineBuilder;
 
@@ -1492,6 +1544,7 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
     pipelineBuilder.set_multisampling_none();
     pipelineBuilder.disable_blending();
     pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+    pipelineBuilder.enable_colorblending();
 
     pipelineBuilder.set_color_attachment_format(engine->_drawImage.imageFormat);
     pipelineBuilder.set_depth_format(engine->_depthImage.imageFormat);
@@ -1505,17 +1558,35 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
 
     transparentPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device);
 
+    pipelineBuilder.clear();
+    pipelineBuilder.set_shaders(shadowVertexShader);
+    pipelineBuilder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
+    pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipelineBuilder.set_multisampling_none();
+    pipelineBuilder.disable_blending();
+    pipelineBuilder.disable_colorblending();
+    pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+
+    pipelineBuilder.set_depth_format(engine->_shadowImage.imageFormat);
+
+    pipelineBuilder._pipelineLayout = shadowLayout;
+    shadowPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device);
+
     vkDestroyShaderModule(engine->_device, meshVertexShader, nullptr);
     vkDestroyShaderModule(engine->_device, meshFragShader, nullptr);
+    vkDestroyShaderModule(engine->_device, shadowVertexShader, nullptr);
 }
 void GLTFMetallic_Roughness::clear_resources(VkDevice device)
 {
     vkDestroyDescriptorSetLayout(device, materialLayout, nullptr);
+    vkDestroyDescriptorSetLayout(device, shadowLayout, nullptr);
     vkDestroyPipelineLayout(device, transparentPipeline.layout, nullptr);
+    vkDestroyPipelineLayout(device, shadowPipeline.layout, nullptr);
 
     vkDestroyPipeline(device, transparentPipeline.pipeline, nullptr);
     vkDestroyPipeline(device, opaquePipeline.pipeline, nullptr);
-
+    vkDestroyPipeline(device, shadowPipeline.pipeline, nullptr);
 }
 
 MaterialInstance GLTFMetallic_Roughness::write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator)
@@ -1529,6 +1600,7 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VkDevice device, Materia
     else
     {
         matData.pipeline = &opaquePipeline;
+        matData.shadowPipeline = &shadowPipeline;
     }
 
     matData.materialSet = descriptorAllocator.allocate(device, materialLayout);
@@ -1558,9 +1630,11 @@ void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
         def.transform = nodeMatrix;
         def.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
 
+
         if (s.material->data.passType == MaterialPass::MainColor)
         {
             ctx.OpaqueSurfaces.push_back(def);
+            
         }
         else if (s.material->data.passType == MaterialPass::Transparent)
         {

@@ -49,6 +49,14 @@ void PipelineBuilder::set_shaders(VkShaderModule vertexShader, VkShaderModule fr
 	_shaderStages.push_back(
 		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
 }
+void PipelineBuilder::set_shaders(VkShaderModule vertexShader)
+{
+	_shaderStages.clear();
+
+	_shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertexShader));
+}
+
 void PipelineBuilder::set_input_topology(VkPrimitiveTopology topology)
 {
 	_inputAssembly.topology = topology;
@@ -143,6 +151,30 @@ void PipelineBuilder::enable_depthtest(bool depthWriteEnable, VkCompareOp op)
 	_depthStencil.maxDepthBounds = 1.f;
 }
 
+void PipelineBuilder::enable_colorblending()
+{
+	_colorBlending.pNext = nullptr;
+
+	_colorBlending.logicOpEnable = VK_FALSE;
+	_colorBlending.logicOp = VK_LOGIC_OP_COPY;
+	_colorBlending.attachmentCount = 1;
+	_colorBlending.pAttachments = &_colorBlendAttachment;
+
+	_renderInfo.colorAttachmentCount = 1;
+}
+
+void PipelineBuilder::disable_colorblending()
+{
+	_colorBlending.pNext = nullptr;
+
+	_colorBlending.logicOpEnable = VK_FALSE;
+	_colorBlending.logicOp = VK_LOGIC_OP_COPY;
+	_colorBlending.attachmentCount = 0;
+	_colorBlending.pAttachments = nullptr;
+
+	_renderInfo.colorAttachmentCount = 0;
+}
+
 void PipelineBuilder::clear()
 {
 	_inputAssembly = { .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
@@ -152,8 +184,10 @@ void PipelineBuilder::clear()
 	_pipelineLayout = {};
 	_depthStencil = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
 	_renderInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
+	_colorBlending = {.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
 	_shaderStages.clear();
 }
+
 
 VkPipeline PipelineBuilder::build_pipeline(VkDevice device)
 {
@@ -164,15 +198,6 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device)
 
 	viewportState.viewportCount = 1;
 	viewportState.scissorCount = 1;
-
-	VkPipelineColorBlendStateCreateInfo colorBlending = { };
-	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlending.pNext = nullptr;
-
-	colorBlending.logicOpEnable = VK_FALSE;
-	colorBlending.logicOp = VK_LOGIC_OP_COPY;
-	colorBlending.attachmentCount = 1;
-	colorBlending.pAttachments = &_colorBlendAttachment;
 
 	VkPipelineVertexInputStateCreateInfo _vertexInputInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 
@@ -188,7 +213,7 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device)
 	pipelineInfo.pViewportState = &viewportState;
 	pipelineInfo.pRasterizationState = &_rasterizer;
 	pipelineInfo.pMultisampleState = &_multisampling;
-	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.pColorBlendState = &_colorBlending;
 	pipelineInfo.pDepthStencilState = &_depthStencil;
 	pipelineInfo.layout = _pipelineLayout;
 

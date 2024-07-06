@@ -24,6 +24,7 @@ public:
 	PipelineBuilder() { clear(); }
 
 	void set_shaders(VkShaderModule vertexShader, VkShaderModule fragmentShader);
+	void set_shaders(VkShaderModule vertexShader);
 	void set_input_topology(VkPrimitiveTopology topology);
 	void set_polygon_mode(VkPolygonMode mode);
 	void set_cull_mode(VkCullModeFlags cullMode, VkFrontFace frontFace);

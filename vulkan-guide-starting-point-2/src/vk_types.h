@@ -139,6 +139,13 @@ struct GPUDrawPushConstants
 	VkDeviceAddress vertexBuffer;
 };
 
+struct GPUShadowDrawPushConstants
+{
+	glm::mat4 worldMatrix;
+	glm::mat4 lightViewProj;
+	VkDeviceAddress vertexBuffer;
+};
+
 struct FrameData
 {
 	VkCommandPool _commandPool;
@@ -183,6 +190,7 @@ struct MaterialPipeline
 struct MaterialInstance
 {
 	MaterialPipeline* pipeline;
+	MaterialPipeline* shadowPipeline;
 	VkDescriptorSet materialSet;
 	MaterialPass passType;
 };

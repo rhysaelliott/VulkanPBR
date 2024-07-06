@@ -14,8 +14,10 @@ struct GLTFMetallic_Roughness
 {
 	MaterialPipeline opaquePipeline;
 	MaterialPipeline transparentPipeline;
+	MaterialPipeline shadowPipeline;
 
 	VkDescriptorSetLayout materialLayout;
+	VkDescriptorSetLayout shadowLayout;
 
 	struct MaterialConstants
 	{
@@ -230,5 +232,6 @@ private:
 	void destroy_swapchain();
 	void resize_swapchain();
 
-
+	std::vector<uint32_t> opaqueDraws;
+	void sort_opaque_draws();
 };
