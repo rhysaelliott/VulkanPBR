@@ -250,13 +250,13 @@ void VulkanEngine::init_swapchain()
 
     //create shadow image
     _shadowImage.imageFormat = VK_FORMAT_D32_SFLOAT;
-    _shadowImage.imageExtent = drawImageExtent;
+    _shadowImage.imageExtent = VkExtent3D(drawImageExtent.width / 2, drawImageExtent.height / 2, 1);
     VkImageUsageFlags shadowImageUsage{};
     shadowImageUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     shadowImageUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
     VkImageCreateInfo simgInfo =
-        vkinit::image_create_info(_shadowImage.imageFormat, shadowImageUsage, drawImageExtent);
+        vkinit::image_create_info(_shadowImage.imageFormat, shadowImageUsage,_shadowImage.imageExtent);
 
     vmaCreateImage(_allocator, &simgInfo, &rimg_allocInfo, &_shadowImage.image, &_shadowImage.allocation, nullptr);
 
@@ -602,24 +602,26 @@ void VulkanEngine::init_default_data()
 
     LightStruct light1 = {};
     light1.color = glm::vec3 (1.5f, 0.f, 0.f);
-    light1.position = glm::vec3(30.f, 2, -85.f);
-    light1.range = 150.f;
-    light1.constant = 1.0f;
+    light1.position = glm::vec3(30.f, 0, -85.f);
+    light1.range = 1500.f;
+    light1.constant = 0.0f;
     light1.linear = 0.1f;
     light1.quadratic = 0.1f;
     light1.intensity = 100;
+    light1.shadowMap = _shadowImage;
 
     LightStruct light2 = {};
     light2.color = glm::vec3(0.0f, 0.0f, 1.0f);
     light2.position = glm::vec3(20.f, -0, -85.f);
-    light2.range = 15.f;
+    light2.range = 150.f;
     light2.constant = 1.0f;
     light2.linear = 0.1f;
     light2.quadratic = 0.1f;
-    light2.intensity = 10;
+    light2.intensity = 200;
+    light2.shadowMap = _shadowImage;
 
     sceneLights.push_back(light1);
-  //  sceneLights.push_back(light2);
+   // sceneLights.push_back(light2);
 }
 
 void VulkanEngine::init_imgui()
@@ -971,12 +973,14 @@ void VulkanEngine::draw()
 
     if (!staticShadowsDrawn)
     {
+        for (auto& l : sceneLights)
+        {
+            vkutil::transition_image(cmd, l.shadowMap.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-        vkutil::transition_image(cmd, _shadowImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+            draw_shadows(cmd, l);
 
-        draw_shadows(cmd);
-
-        vkutil::transition_image(cmd, _shadowImage.image, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+            vkutil::transition_image(cmd, l.shadowMap.image, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+        }
         staticShadowsDrawn = true;
     }
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
@@ -1035,22 +1039,21 @@ void VulkanEngine::draw()
     _frameNumber++;
 }
 
-void VulkanEngine::draw_shadows(VkCommandBuffer cmd)
+void VulkanEngine::draw_shadows(VkCommandBuffer cmd, LightStruct& light)
 {
     VkRenderingAttachmentInfo depthAttachment =
-        vkinit::depth_attachment_info(_shadowImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        vkinit::depth_attachment_info(light.shadowMap.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     VkRenderingInfo renderInfo =
-        vkinit::shadow_rendering_info(VkExtent2D(_shadowImage.imageExtent.width, _shadowImage.imageExtent.height), &depthAttachment);
+        vkinit::shadow_rendering_info(VkExtent2D(light.shadowMap.imageExtent.width, light.shadowMap.imageExtent.height), &depthAttachment);
     vkCmdBeginRendering(cmd, &renderInfo);
 
-    //todo write light render buffer
 
     VkViewport viewport = {};
     viewport.x = 0;
     viewport.y = 0;
-    viewport.width = _shadowImage.imageExtent.width;
-    viewport.height = _shadowImage.imageExtent.height;
+    viewport.width = light.shadowMap.imageExtent.width;
+    viewport.height = light.shadowMap.imageExtent.height;
     viewport.minDepth = 0.f;
     viewport.maxDepth = 1.f;
     
@@ -1060,20 +1063,21 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd)
     VkRect2D scissor = {};
     scissor.offset.x = 0;
     scissor.offset.y = 0;
-    scissor.extent.width = _shadowImage.imageExtent.width;
-    scissor.extent.height = _shadowImage.imageExtent.height;
+    scissor.extent.width = light.shadowMap.imageExtent.width;
+    scissor.extent.height = light.shadowMap.imageExtent.height;
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     //todo do for each light
-    glm::vec3 lightPos = sceneLights[0].position;
+    glm::vec3 lightPos = light.position;
     glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 lightProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
 
     sort_opaque_draws(lightProj * lightView);
 
-    sceneLights[0].viewproj = lightProj * lightView;
-
+    //todo sort out properly
+    light.viewproj = lightProj * lightView;
+    //sceneLights[0].viewproj = light.viewproj;
 
     auto draw = [&](const RenderObject& draw)
         {
@@ -1085,7 +1089,6 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd)
             pushConstants.vertexBuffer = draw.vertexBufferAddress;
             pushConstants.worldMatrix = draw.transform;
 
-            //todo sort view proj
             pushConstants.lightViewProj = lightProj * lightView;
 
             vkCmdPushConstants(cmd, draw.material->shadowPipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUShadowDrawPushConstants), &pushConstants);
@@ -1182,10 +1185,10 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     writer.write_buffer(0, gpuLightBuffer.buffer, sizeof(lightData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(_device, lightDescriptor);
 
-    //todo write shadow data
+    //write shadow data
     writer.clear();
     VkDescriptorSet shadowDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _shadowImageDescriptorLayout);
-    writer.write_image(0, _shadowImage.imageView, _defaultSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.write_image(0, sceneLights[0].shadowMap.imageView, _defaultSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
     writer.update_set(_device, shadowDescriptor);
 
@@ -1244,16 +1247,18 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
             //handle light data
             //todo sort light buffer
             //todo clear light data
-            std::fill(std::begin(lightData.lights), std::end(lightData.lights), LightStruct{});
+            std::fill(std::begin(lightData.lights), std::end(lightData.lights), GPULightStruct{});
             lightData.numLights = 0;
 
-            for (const auto& l : sceneLights)
+            for (auto& l : sceneLights)
             {
                 //if (is_light_affecting_object(l, draw) == true)
                 {
                     if (lightData.numLights < 10)
                     {
-                       lightData.lights[lightData.numLights++] = l;
+                        GPULightStruct gpuLight;
+                        l.CopyToGPU(gpuLight);
+                        lightData.lights[lightData.numLights++] = gpuLight;
                     }
                 }
             }
@@ -1682,4 +1687,19 @@ void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
     }
 
     Node::Draw(topMatrix, ctx);
+}
+
+void LightStruct::CopyToGPU(GPULightStruct& gpuLight)
+{
+    gpuLight.viewproj = viewproj;
+    gpuLight.position = position;
+    gpuLight.cone = cone;
+    gpuLight.color = color;
+    gpuLight.range = range;
+    gpuLight.direction = direction;
+    gpuLight.intensity = intensity;
+    gpuLight.constant = constant;
+    gpuLight.linear = linear;
+    gpuLight.quadratic = quadratic;
+    gpuLight.lightType = lightType;
 }

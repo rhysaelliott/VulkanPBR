@@ -193,7 +193,7 @@ public:
 	//draw loop
 	void draw();
 
-	void draw_shadows(VkCommandBuffer cmd);
+	void draw_shadows(VkCommandBuffer cmd, LightStruct& light);
 
 	void draw_background(VkCommandBuffer cmd);
 

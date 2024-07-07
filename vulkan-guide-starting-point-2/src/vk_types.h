@@ -44,7 +44,16 @@ enum LightType
 	SpotLight
 };
 
-struct LightStruct
+struct AllocatedImage
+{
+	VkImage image;
+	VkImageView imageView;
+	VmaAllocation allocation;
+	VkExtent3D imageExtent;
+	VkFormat imageFormat;
+};
+
+struct GPULightStruct
 {
 	glm::mat4 viewproj;
 	glm::vec3 position;
@@ -58,11 +67,34 @@ struct LightStruct
 	float quadratic;
 	LightType lightType;
 
-	LightStruct()
+	GPULightStruct()
 		: viewproj(glm::mat4(0)), position(glm::vec3(0)), lightType(LightType::PointLight), color(glm::vec3(0)), cone(0.0f),
 		direction(glm::vec3(0)), range(0.0f), intensity(0.0f), constant(0.0f),
 		linear(0.0f), quadratic(0.0f) {}
 };
+
+struct LightStruct
+{
+	glm::mat4 viewproj;
+	glm::vec3 position;
+	float cone;
+	glm::vec3 color;
+	float range;
+	glm::vec3 direction;
+	float intensity;
+	float constant;
+	float linear;
+	float quadratic;
+	LightType lightType;
+	AllocatedImage shadowMap;
+
+	LightStruct()
+		: viewproj(glm::mat4(0)), position(glm::vec3(0)), lightType(LightType::PointLight), color(glm::vec3(0)), cone(0.0f),
+		direction(glm::vec3(0)), range(0.0f), intensity(0.0f), constant(0.0f),
+		linear(0.0f), quadratic(0.0f) {}
+	void CopyToGPU(GPULightStruct& gpuLight);
+};
+
 
 struct DelectionQueue
 {
@@ -84,14 +116,6 @@ struct DelectionQueue
 	}
 };
 
-struct AllocatedImage
-{
-	VkImage image;
-	VkImageView imageView;
-	VmaAllocation allocation;
-	VkExtent3D imageExtent;
-	VkFormat imageFormat;
-};
 
 struct ComputePushConstants
 {
@@ -171,9 +195,10 @@ struct GPUSceneData
 
 struct LightBuffer
 {
-	LightStruct lights[10];
+	GPULightStruct lights[10];
 	int numLights;
 };
+
 
 enum class MaterialPass : uint8_t
 {
