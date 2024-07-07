@@ -55,6 +55,10 @@ float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 	return ggx1*ggx2;
 }
 
+float shadowCalculation(vec4 fragPosLightSpace)
+{
+	
+}
 
 
 void main()
@@ -120,7 +124,10 @@ void main()
 		}
 	}
 
+	
 
+	float shadow = shadowCalculation();
 
-	outFragColor =vec4(color*lightValue*sceneData.sunlightColor.w + ambient + lightColor, 1.0f);
+	outFragColor =vec4((color*lightValue*sceneData.sunlightColor.w + ambient + lightColor)*(1.0-shadow), 1.0f);
+
 }

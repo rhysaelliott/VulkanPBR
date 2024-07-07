@@ -7,6 +7,8 @@
 #include <vk_descriptors.h>
 #include <vk_pipelines.h>
 #include <vk_loader.h>
+#include <glm/gtx/transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <camera.h>
 
 
@@ -114,6 +116,7 @@ public:
 	AllocatedImage _drawImage;
 	AllocatedImage _depthImage;
 	AllocatedImage _shadowImage;
+	VkDescriptorSetLayout _shadowImageDescriptorLayout;
 
 	VkExtent2D _drawExtent;
 	float renderScale = 1.f;
@@ -233,5 +236,5 @@ private:
 	void resize_swapchain();
 
 	std::vector<uint32_t> opaqueDraws;
-	void sort_opaque_draws();
+	void sort_opaque_draws(glm::mat4 viewproj);
 };

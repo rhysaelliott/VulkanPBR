@@ -333,6 +333,8 @@ void VulkanEngine::init_descriptors()
 
     writer.update_set(_device, _drawImageDescriptors);
 
+
+
     for (int i = 0; i < FRAME_OVERLAP; i++)
     {
         //create descriptor pool
@@ -365,6 +367,13 @@ void VulkanEngine::init_descriptors()
         _gpuLightDataDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_FRAGMENT_BIT);
     }
 
+
+    {
+        DescriptorLayoutBuilder builder;
+        builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        _shadowImageDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+    }
+
     {
         DescriptorLayoutBuilder builder;
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
@@ -377,6 +386,7 @@ void VulkanEngine::init_descriptors()
 
             vkDestroyDescriptorSetLayout(_device, _drawImageDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _singleImageDescriptorLayout, nullptr);
+            vkDestroyDescriptorSetLayout(_device, _shadowImageDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _gpuLightDataDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
         });
@@ -918,7 +928,6 @@ void VulkanEngine::update_scene()
     sceneData.sunlightColor = glm::vec4(1.f);
     sceneData.sunlightDirection = glm::vec4(0,1,0.5,1.f);
 
-    sort_opaque_draws();
 
     auto end = std::chrono::system_clock::now();
 
@@ -1025,7 +1034,7 @@ void VulkanEngine::draw()
 void VulkanEngine::draw_shadows(VkCommandBuffer cmd)
 {
     VkRenderingAttachmentInfo depthAttachment =
-        vkinit::depth_attachment_info(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        vkinit::depth_attachment_info(_shadowImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     VkRenderingInfo renderInfo =
         vkinit::shadow_rendering_info(VkExtent2D(_shadowImage.imageExtent.width, _shadowImage.imageExtent.height), &depthAttachment);
@@ -1053,6 +1062,14 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd)
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
 
+    glm::vec3 lightPos = sceneLights[1].position;
+    glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 lightProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
+
+    sort_opaque_draws(lightProj * lightView);
+
+
+
 
     auto draw = [&](const RenderObject& draw)
         {
@@ -1062,9 +1079,10 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd)
 
             GPUShadowDrawPushConstants pushConstants;
             pushConstants.vertexBuffer = draw.vertexBufferAddress;
-            //todo sort view proj
-            pushConstants.lightViewProj = draw.transform;
             pushConstants.worldMatrix = draw.transform;
+
+            //todo sort view proj
+            pushConstants.lightViewProj = lightProj * lightView;
 
             vkCmdPushConstants(cmd, draw.material->shadowPipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUShadowDrawPushConstants), &pushConstants);
 
@@ -1099,14 +1117,14 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
     vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16.0), std::ceil(_drawExtent.height / 16.0), 1);
 }
 
-void VulkanEngine::sort_opaque_draws()
+void VulkanEngine::sort_opaque_draws(glm::mat4 viewproj)
 {
     opaqueDraws.clear();
     opaqueDraws.reserve(mainDrawContext.OpaqueSurfaces.size());
 
     for (uint32_t i = 0; i < mainDrawContext.OpaqueSurfaces.size(); i++)
     {
-        if (is_visible(mainDrawContext.OpaqueSurfaces[i], sceneData.viewproj))
+        if (is_visible(mainDrawContext.OpaqueSurfaces[i], viewproj))
         {
             opaqueDraws.push_back(i);
         }
@@ -1129,6 +1147,7 @@ void VulkanEngine::sort_opaque_draws()
 
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 {
+    sort_opaque_draws(sceneData.viewproj);
 
     VkRenderingAttachmentInfo colorAttachment =
         vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -1158,6 +1177,13 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     VkDescriptorSet lightDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _gpuLightDataDescriptorLayout);
     writer.write_buffer(0, gpuLightBuffer.buffer, sizeof(lightData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(_device, lightDescriptor);
+
+    //todo write shadow data
+    writer.clear();
+    VkDescriptorSet shadowDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _shadowImageDescriptorLayout);
+    writer.write_image(0, _shadowImage.imageView, _defaultSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
+    writer.update_set(_device, shadowDescriptor);
 
     //reset counters
     stats.drawcallCount = 0;
@@ -1236,6 +1262,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
             }
 
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 3, 1, &shadowDescriptor, 0, nullptr);
 
             GPUDrawPushConstants pushConstants;
             pushConstants.vertexBuffer = draw.vertexBufferAddress;
@@ -1505,31 +1532,36 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
     layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     layoutBuilder.add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     layoutBuilder.add_binding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    layoutBuilder.add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
     materialLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    shadowLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
 
-    VkDescriptorSetLayout layouts[] = { engine->_gpuSceneDataDescriptorLayout, materialLayout, engine->_gpuLightDataDescriptorLayout };
+    VkDescriptorSetLayout layouts[] = {
+        engine->_gpuSceneDataDescriptorLayout,
+        materialLayout,
+        engine->_gpuLightDataDescriptorLayout,
+        engine->_shadowImageDescriptorLayout 
+    };
 
     VkPipelineLayoutCreateInfo meshLayoutInfo = vkinit::pipeline_layout_create_info();
-    meshLayoutInfo.setLayoutCount = 3;
+    meshLayoutInfo.setLayoutCount = 4;
     meshLayoutInfo.pSetLayouts = layouts;
     meshLayoutInfo.pPushConstantRanges = &bufferRange;
     meshLayoutInfo.pushConstantRangeCount = 1;
+    VkPipelineLayout newLayout;
+    VK_CHECK(vkCreatePipelineLayout(engine->_device, &meshLayoutInfo, nullptr, &newLayout));
+
+    opaquePipeline.layout = newLayout;
+    transparentPipeline.layout = newLayout;
+
+    shadowLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
 
     VkPipelineLayoutCreateInfo shadowLayoutInfo = vkinit::pipeline_layout_create_info();
     shadowLayoutInfo.setLayoutCount = 0;
     shadowLayoutInfo.pSetLayouts = nullptr;
     shadowLayoutInfo.pPushConstantRanges = &shadowBufferRange;
     shadowLayoutInfo.pushConstantRangeCount = 1;
-
-    VkPipelineLayout newLayout;
-    VK_CHECK(vkCreatePipelineLayout(engine->_device, &meshLayoutInfo, nullptr, &newLayout));
-
-    opaquePipeline.layout = newLayout;
-    transparentPipeline.layout = newLayout;
     
-    //todo create shadow layout
     VkPipelineLayout shadowLayout;
     VK_CHECK(vkCreatePipelineLayout(engine->_device, &shadowLayoutInfo, nullptr, &shadowLayout));
     shadowPipeline.layout = shadowLayout;
@@ -1614,6 +1646,7 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VkDevice device, Materia
 
     return matData;
 }
+
 
 void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
 {
