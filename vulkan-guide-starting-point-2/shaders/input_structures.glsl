@@ -18,6 +18,7 @@ layout(set=1, binding=0) uniform GLTFMaterialData
 
 struct LightStruct
 {
+	mat4 viewproj;
     vec3 position;
     float cone;         
     vec3 color;

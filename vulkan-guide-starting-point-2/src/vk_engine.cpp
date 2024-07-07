@@ -603,11 +603,11 @@ void VulkanEngine::init_default_data()
     LightStruct light1 = {};
     light1.color = glm::vec3 (1.5f, 0.f, 0.f);
     light1.position = glm::vec3(30.f, -0, -85.f);
-    light1.range = 15.f;
+    light1.range = 150.f;
     light1.constant = 1.0f;
     light1.linear = 0.1f;
     light1.quadratic = 0.1f;
-    light1.intensity = 10;
+    light1.intensity = 100;
 
     LightStruct light2 = {};
     light2.color = glm::vec3(0.0f, 0.0f, 1.0f);
@@ -619,7 +619,7 @@ void VulkanEngine::init_default_data()
     light2.intensity = 10;
 
     sceneLights.push_back(light1);
-    sceneLights.push_back(light2);
+  //  sceneLights.push_back(light2);
 }
 
 void VulkanEngine::init_imgui()
@@ -1061,14 +1061,14 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd)
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-
-    glm::vec3 lightPos = sceneLights[1].position;
+    //todo do for each light
+    glm::vec3 lightPos = sceneLights[0].position;
     glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 lightProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
 
     sort_opaque_draws(lightProj * lightView);
 
-
+    sceneLights[0].viewproj = lightProj * lightView;
 
 
     auto draw = [&](const RenderObject& draw)
@@ -1249,7 +1249,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                 {
                     if (lightData.numLights < 10)
                     {
-                        lightData.lights[lightData.numLights++] = l;
+                       lightData.lights[lightData.numLights++] = l;
                     }
                 }
             }
@@ -1267,6 +1267,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
             GPUDrawPushConstants pushConstants;
             pushConstants.vertexBuffer = draw.vertexBufferAddress;
             pushConstants.worldMatrix = draw.transform;
+            
             vkCmdPushConstants(cmd, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
 
             vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
