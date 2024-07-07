@@ -117,6 +117,7 @@ public:
 	AllocatedImage _depthImage;
 	AllocatedImage _shadowImage;
 	VkDescriptorSetLayout _shadowImageDescriptorLayout;
+	bool staticShadowsDrawn = false;
 
 	VkExtent2D _drawExtent;
 	float renderScale = 1.f;

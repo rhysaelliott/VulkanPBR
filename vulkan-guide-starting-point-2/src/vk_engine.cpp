@@ -602,7 +602,7 @@ void VulkanEngine::init_default_data()
 
     LightStruct light1 = {};
     light1.color = glm::vec3 (1.5f, 0.f, 0.f);
-    light1.position = glm::vec3(30.f, -0, -85.f);
+    light1.position = glm::vec3(30.f, 2, -85.f);
     light1.range = 150.f;
     light1.constant = 1.0f;
     light1.linear = 0.1f;
@@ -925,7 +925,7 @@ void VulkanEngine::update_scene()
     sceneData.viewproj = sceneData.proj * sceneData.view;
 
     sceneData.ambientColor = glm::vec4(.1f);
-    sceneData.sunlightColor = glm::vec4(1.f);
+    sceneData.sunlightColor = glm::vec4(0.5f);
     sceneData.sunlightDirection = glm::vec4(0,1,0.5,1.f);
 
 
@@ -969,12 +969,16 @@ void VulkanEngine::draw()
     //record to command buffer
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    vkutil::transition_image(cmd, _shadowImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    if (!staticShadowsDrawn)
+    {
 
-    draw_shadows(cmd);
+        vkutil::transition_image(cmd, _shadowImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    vkutil::transition_image(cmd, _shadowImage.image, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+        draw_shadows(cmd);
 
+        vkutil::transition_image(cmd, _shadowImage.image, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+        staticShadowsDrawn = true;
+    }
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     draw_background(cmd);

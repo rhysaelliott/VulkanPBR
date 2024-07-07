@@ -139,6 +139,6 @@ void main()
 	vec4 fragPosLightSpace = lightData.lights[0].viewproj * vec4(inPos,1.0);
 	float shadow = shadowCalculation(fragPosLightSpace);
 
-	outFragColor =vec4(color*lightValue*sceneData.sunlightColor.w + ambient + (lightColor*(1.0-shadow)), 1.0f);
+	outFragColor =vec4(color*lightValue*sceneData.sunlightColor.w + ambient + (lightColor*(shadow)), 1.0f);
 
 }
