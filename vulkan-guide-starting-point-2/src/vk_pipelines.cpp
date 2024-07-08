@@ -127,6 +127,10 @@ void PipelineBuilder::set_depth_format(VkFormat format)
 {
 	_renderInfo.depthAttachmentFormat = format;
 }
+void PipelineBuilder::enable_cubemap()
+{
+	_renderInfo.viewMask = 0;
+}
 void PipelineBuilder::disable_depthtest()
 {
 	_depthStencil.depthTestEnable = VK_FALSE;
@@ -216,7 +220,7 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device)
 	pipelineInfo.pColorBlendState = &_colorBlending;
 	pipelineInfo.pDepthStencilState = &_depthStencil;
 	pipelineInfo.layout = _pipelineLayout;
-
+	
 	//create dynamic state
 	VkDynamicState state[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 

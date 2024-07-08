@@ -120,12 +120,12 @@ void VulkanEngine::init()
 
     init_imgui();
 
-    std::string structurePath = { "..\\..\\assets\\structure.glb" };
+    std::string structurePath = { "..\\..\\assets\\test.glb" };
     auto structureFile = loadGltf(this, structurePath);
 
     assert(structureFile.has_value());
 
-    loadedScenes["structure"] = *structureFile;
+    loadedScenes["test"] = *structureFile;
 
     // everything went fine
     _isInitialized = true;
@@ -250,18 +250,19 @@ void VulkanEngine::init_swapchain()
 
     //create shadow image
     _shadowImage.imageFormat = VK_FORMAT_D32_SFLOAT;
-    _shadowImage.imageExtent = VkExtent3D(drawImageExtent.width / 2, drawImageExtent.height / 2, 1);
+    _shadowImage.imageExtent = VkExtent3D(1024, 1024, 1);
     VkImageUsageFlags shadowImageUsage{};
     shadowImageUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     shadowImageUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
+
     VkImageCreateInfo simgInfo =
-        vkinit::image_create_info(_shadowImage.imageFormat, shadowImageUsage,_shadowImage.imageExtent);
+        vkinit::image_cubemap_create_info(_shadowImage.imageFormat, shadowImageUsage,_shadowImage.imageExtent);
 
     vmaCreateImage(_allocator, &simgInfo, &rimg_allocInfo, &_shadowImage.image, &_shadowImage.allocation, nullptr);
 
     VkImageViewCreateInfo sviewInfo =
-        vkinit::imageview_create_info(_shadowImage.imageFormat, _shadowImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+        vkinit::imageview_cubemap_create_info(_shadowImage.imageFormat, _shadowImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
 
     VK_CHECK(vkCreateImageView(_device, &sviewInfo, nullptr, &_shadowImage.imageView));
 
@@ -595,18 +596,18 @@ void VulkanEngine::init_default_data()
 
         });
     mainCamera.velocity = glm::vec3(0.f);
-    mainCamera.position = glm::vec3(30.f, -0.f, -85.f);
+    mainCamera.position = glm::vec3(5.f, 5.f, 0.f);
 
     mainCamera.pitch = 0;
     mainCamera.yaw = 0;
 
     LightStruct light1 = {};
     light1.color = glm::vec3 (1.5f, 0.f, 0.f);
-    light1.position = glm::vec3(30.f, 0, -85.f);
+    light1.position = glm::vec3(5.f, 5, 0.f);
     light1.range = 1500.f;
     light1.constant = 0.0f;
-    light1.linear = 0.1f;
-    light1.quadratic = 0.1f;
+    light1.linear = 0.f;
+    light1.quadratic = 0.f;
     light1.intensity = 100;
     light1.shadowMap = _shadowImage;
 
@@ -916,7 +917,7 @@ void VulkanEngine::update_scene()
 
     //loadedNodes["Suzanne"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
 
-    loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
+    loadedScenes["test"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
 
     mainCamera.update();
     sceneData.view = mainCamera.getViewMatrix();
@@ -971,15 +972,19 @@ void VulkanEngine::draw()
     //record to command buffer
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    if (!staticShadowsDrawn)
+    //if (!staticShadowsDrawn)
     {
         for (auto& l : sceneLights)
         {
-            vkutil::transition_image(cmd, l.shadowMap.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+            for (uint32_t face = 0; face < 6; ++face)
+            {
 
-            draw_shadows(cmd, l);
+                vkutil::transition_image(cmd, l.shadowMap.image,face ,VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-            vkutil::transition_image(cmd, l.shadowMap.image, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+                draw_shadows(cmd, l, face);
+
+                vkutil::transition_image(cmd, l.shadowMap.image,face, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+            }
         }
         staticShadowsDrawn = true;
     }
@@ -1039,15 +1044,16 @@ void VulkanEngine::draw()
     _frameNumber++;
 }
 
-void VulkanEngine::draw_shadows(VkCommandBuffer cmd, LightStruct& light)
+void VulkanEngine::draw_shadows(VkCommandBuffer cmd, LightStruct& light, uint32_t face)
 {
     VkRenderingAttachmentInfo depthAttachment =
         vkinit::depth_attachment_info(light.shadowMap.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    
 
     VkRenderingInfo renderInfo =
         vkinit::shadow_rendering_info(VkExtent2D(light.shadowMap.imageExtent.width, light.shadowMap.imageExtent.height), &depthAttachment);
     vkCmdBeginRendering(cmd, &renderInfo);
-
+    renderInfo.layerCount = 1;
 
     VkViewport viewport = {};
     viewport.x = 0;
@@ -1068,16 +1074,14 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd, LightStruct& light)
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    //todo do for each light
-    glm::vec3 lightPos = light.position;
-    glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 lightProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
+    float near = 1.0f;
+    float far = 25.0f;
+    glm::mat4 lightProj = glm::perspective(glm::radians(90.0f), 1.0f, near, far);
+    glm::mat4 lightView = glm::lookAt(light.position, light.position + cubemapDirections[face], cubemapUps[face]);
 
     sort_opaque_draws(lightProj * lightView);
 
-    //todo sort out properly
     light.viewproj = lightProj * lightView;
-    //sceneLights[0].viewproj = light.viewproj;
 
     auto draw = [&](const RenderObject& draw)
         {
@@ -1609,6 +1613,7 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
     pipelineBuilder.disable_blending();
     pipelineBuilder.disable_colorblending();
     pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+    pipelineBuilder.enable_cubemap();
 
     pipelineBuilder.set_depth_format(engine->_shadowImage.imageFormat);
 
