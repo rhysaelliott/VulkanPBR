@@ -601,6 +601,9 @@ void VulkanEngine::init_default_data()
     mainCamera.yaw = 0;
 
     LightStruct light1 = {};
+    light1.lightType = SpotLight;
+    light1.cone = 1.0f;
+    light1.direction = glm::vec3(1.0f, 0.f, 0.f);
     light1.color = glm::vec3 (1.5f, 0.f, 0.f);
     light1.position = glm::vec3(30.f, 0, -85.f);
     light1.range = 1500.f;
@@ -610,18 +613,7 @@ void VulkanEngine::init_default_data()
     light1.intensity = 100;
     light1.shadowMap = _shadowImage;
 
-    LightStruct light2 = {};
-    light2.color = glm::vec3(0.0f, 0.0f, 1.0f);
-    light2.position = glm::vec3(20.f, -0, -85.f);
-    light2.range = 150.f;
-    light2.constant = 1.0f;
-    light2.linear = 0.1f;
-    light2.quadratic = 0.1f;
-    light2.intensity = 200;
-    light2.shadowMap = _shadowImage;
-
     sceneLights.push_back(light1);
-   // sceneLights.push_back(light2);
 }
 
 void VulkanEngine::init_imgui()
@@ -971,7 +963,8 @@ void VulkanEngine::draw()
     //record to command buffer
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    if (!staticShadowsDrawn)
+    //TODO CHANGE BACK
+    //if (!staticShadowsDrawn)
     {
         for (auto& l : sceneLights)
         {
