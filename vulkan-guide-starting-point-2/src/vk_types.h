@@ -191,7 +191,6 @@ struct GPUSceneData
 	glm::vec4 ambientColor;
 	glm::vec4 sunlightDirection;
 	glm::vec4 sunlightColor;
-
 };
 
 struct LightBuffer

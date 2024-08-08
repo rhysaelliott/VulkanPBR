@@ -38,7 +38,6 @@ public:
 	void enable_depthtest(bool depthWriteEnable, VkCompareOp op);
 	void disable_colorblending();
 	void enable_colorblending();
-	void enable_cubemap();
 
 	void clear();
 

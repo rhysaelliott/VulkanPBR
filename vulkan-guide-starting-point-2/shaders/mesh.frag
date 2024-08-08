@@ -55,14 +55,14 @@ float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 	return ggx1*ggx2;
 }
 
-float shadowCalculation(vec3 fragToLight)
+float shadowCalculation(vec4 fragPosLightSpace)
 {
+	vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
 
-	float closestDepth = texture(shadowTex, fragToLight).r;
+	projCoords = projCoords*0.5 +0.5;
 
-	closestDepth*=25.0;
-
-	float currentDepth = length(fragToLight);
+	float closestDepth = texture(shadowTex, projCoords.xy).r;
+	float currentDepth = projCoords.z;
 
 	float bias =0.005;
 
@@ -131,8 +131,8 @@ void main()
 
 			//accumulate light contribution
 
-			vec3 fragToLight = inPos-light.position;
-			float shadow = shadowCalculation(fragToLight);
+			vec4 fragPosLightSpace = light.viewproj * vec4(inPos,1.0);
+			float shadow = shadowCalculation(fragPosLightSpace);
 
 			lightColor +=( (diffuse+spec) * radiance * max(dot(nn,L),0.0)* (1.0-shadow));	
 		}
@@ -141,8 +141,5 @@ void main()
 	
 
 	outFragColor =vec4(color*lightValue*sceneData.sunlightColor.w + ambient + lightColor, 1.0f);
-	
-	//vec3 fragToLight = inPos-lightData.lights[0].position;
-	//float closestDepth = texture(shadowTex, fragToLight).r;
-	//outFragColor = vec4(vec3(closestDepth), 1.0);
+
 }

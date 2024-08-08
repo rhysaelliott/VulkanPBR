@@ -193,7 +193,7 @@ public:
 	//draw loop
 	void draw();
 
-	void draw_shadows(VkCommandBuffer cmd, LightStruct& light, uint32_t face);
+	void draw_shadows(VkCommandBuffer cmd, LightStruct& light);
 
 	void draw_background(VkCommandBuffer cmd);
 
@@ -238,22 +238,4 @@ private:
 
 	std::vector<uint32_t> opaqueDraws;
 	void sort_opaque_draws(glm::mat4 viewproj);
-
-	glm::vec3 cubemapDirections[6] = {
-	glm::vec3(1.0f, 0.0f, 0.0f),  // Positive X
-	glm::vec3(-1.0f, 0.0f, 0.0f), // Negative X
-	glm::vec3(0.0f, 1.0f, 0.0f),  // Positive Y
-	glm::vec3(0.0f, -1.0f, 0.0f), // Negative Y
-	glm::vec3(0.0f, 0.0f, 1.0f),  // Positive Z
-	glm::vec3(0.0f, 0.0f, -1.0f)  // Negative Z
-	};
-
-	glm::vec3 cubemapUps[6] = {
-		glm::vec3(0.0f, -1.0f, 0.0f), // Positive X
-		glm::vec3(0.0f, -1.0f, 0.0f), // Negative X
-		glm::vec3(0.0f, 0.0f, 1.0f),  // Positive Y
-		glm::vec3(0.0f, 0.0f, -1.0f), // Negative Y
-		glm::vec3(0.0f, -1.0f, 0.0f), // Positive Z
-		glm::vec3(0.0f, -1.0f, 0.0f)  // Negative Z
-	};
 };
