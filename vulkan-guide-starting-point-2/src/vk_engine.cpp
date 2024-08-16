@@ -602,8 +602,8 @@ void VulkanEngine::init_default_data()
 
     LightStruct light1 = {};
     light1.lightType = SpotLight;
-    light1.cone = 1.0f;
-    light1.direction = glm::vec3(1.0f, 0.f, 0.f);
+    light1.cone = 50.0f;
+    light1.direction = glm::vec3(90.0f, 0.f, 0.f);
     light1.color = glm::vec3 (1.5f, 0.f, 0.f);
     light1.position = glm::vec3(30.f, 0, -85.f);
     light1.range = 1500.f;
@@ -1063,7 +1063,7 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd, LightStruct& light)
 
     //todo do for each light
     glm::vec3 lightPos = light.position;
-    glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 lightView = glm::lookAt(lightPos, light.direction, glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 lightProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
 
     sort_opaque_draws(lightProj * lightView);

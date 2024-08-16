@@ -129,12 +129,18 @@ void main()
 			//calculate radiance
 			vec3 radiance = light.color * A * light.intensity;
 
-			//accumulate light contribution
-
+			//calculate shadow
 			vec4 fragPosLightSpace = light.viewproj * vec4(inPos,1.0);
 			float shadow = shadowCalculation(fragPosLightSpace);
 
-			lightColor +=( (diffuse+spec) * radiance * max(dot(nn,L),0.0)* (1.0-shadow));	
+			//accumulate light contribution
+			vec3 color = ( (diffuse+spec) * radiance * max(dot(nn,L),0.0)* (1.0));
+			if(light.lightType ==1)
+			{
+				color *=pow(max(dot(-(vec3(distance)), light.direction), 1.0f), light.cone);
+			}
+
+			lightColor +=color;	
 		}
 	}
 
