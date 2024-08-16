@@ -134,6 +134,7 @@ public:
 	LightBuffer lightData;
 	std::vector<LightStruct> sceneLights;
 	VkDescriptorSetLayout _gpuLightDataDescriptorLayout;
+	VkDescriptorSetLayout _gpuShadowDataDescriptorLayout;
 
 	//temporary textures
 	AllocatedImage _whiteImage;

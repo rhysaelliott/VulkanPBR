@@ -164,11 +164,9 @@ struct GPUDrawPushConstants
 	VkDeviceAddress vertexBuffer;
 };
 
-struct GPUShadowDrawPushConstants
+struct GPUShadowDrawBuffer
 {
-	glm::mat4 worldMatrix;
 	glm::mat4 lightViewProj;
-	VkDeviceAddress vertexBuffer;
 };
 
 struct FrameData

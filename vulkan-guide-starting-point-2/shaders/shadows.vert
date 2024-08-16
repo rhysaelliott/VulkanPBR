@@ -21,7 +21,6 @@ layout(buffer_reference, std430) readonly buffer VertexBuffer
 layout(push_constant) uniform constants
 {
 	mat4 render_matrix;
-	mat4 lightViewProj;
 	VertexBuffer vertexBuffer;
 } PushConstants;
 
@@ -31,6 +30,6 @@ void main()
 	
 	vec4 position = vec4(v.position,1.0f);
 
-	gl_Position = PushConstants.lightViewProj * PushConstants.render_matrix * position;
+	gl_Position = shadowData.viewproj * PushConstants.render_matrix * position;
 
 }
