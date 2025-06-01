@@ -121,7 +121,7 @@ void VulkanEngine::init()
 
     init_imgui();
 
-    std::string structurePath = { "..\\..\\assets\\test.glb" };
+    std::string structurePath = { "..\\..\\assets\\structure.glb" };
     auto structureFile = loadGltf(this, structurePath);
 
     assert(structureFile.has_value());
@@ -588,6 +588,11 @@ void VulkanEngine::init_default_data()
 
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+
+    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
 
     vkCreateSampler(_device, &samplerInfo, nullptr, &_defaultSamplerLinear);
 
@@ -612,7 +617,7 @@ void VulkanEngine::init_default_data()
     light1.cone = 50.0f;
     light1.direction = glm::vec3(0.0f, -1.0f, -1.0f);
     light1.color = glm::vec3 (1.5f, 0.f, 0.f);
-    light1.position = glm::vec3(0.f, 0, 0.f);
+    light1.position = glm::vec3(30.f, 0, -85.f);
     light1.range = 1500.f;
     light1.constant = 0.0f;
     light1.linear = 0.1f;
@@ -1055,13 +1060,10 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd, LightStruct& light)
         vkinit::shadow_rendering_info(VkExtent2D(light.shadowMap.imageExtent.width, light.shadowMap.imageExtent.height), &depthAttachment);
     vkCmdBeginRendering(cmd, &renderInfo);
 
-    float nearPlane = 1.0f;
-    float farPlane = 10.f;
-    light.direction = glm::normalize(glm::vec3(0.0f) - light.position);
 
     glm::mat4 lightView = glm::lookAt(
         light.position,
-        glm::vec3(0.f),
+        light.position + light.direction,
         glm::vec3(0.0f, 1.0f, 0.0f)     
     );
 
@@ -1107,13 +1109,8 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd, LightStruct& light)
     scissor.extent.height = light.shadowMap.imageExtent.height;
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
-    float depthBiasConstant = 1.25f;
-    // Slope depth bias factor, applied depending on polygon's slope
-    float depthBiasSlope = 1.75f;
-
     auto draw = [&](const RenderObject& draw)
         {
-            vkCmdSetDepthBias(cmd, depthBiasConstant, 0.0f, depthBiasSlope);
 
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->shadowPipeline->pipeline);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->shadowPipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
@@ -1656,6 +1653,7 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
     pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
     pipelineBuilder.set_multisampling_none();
     pipelineBuilder.disable_blending();
+   
     pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
     pipelineBuilder.enable_colorblending();
 

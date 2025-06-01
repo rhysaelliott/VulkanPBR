@@ -30,11 +30,7 @@ layout(push_constant) uniform constants
 	VertexBuffer vertexBuffer;
 } PushConstants;
 
-const mat4 biasMat = mat4( 
-	0.5, 0.0, 0.0, 0.0,
-	0.0, 0.5, 0.0, 0.0,
-	0.0, 0.0, 1.0, 0.0,
-	0.5, 0.5, 0.0, 1.0 );
+
 
 void main()
 {
