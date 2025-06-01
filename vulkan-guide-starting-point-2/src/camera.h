@@ -4,7 +4,7 @@
 
 class Camera {
 public:
-
+	bool isActive = true;
 	glm::vec3 velocity;
 	glm::vec3 position;
 
@@ -13,6 +13,9 @@ public:
 
 	glm::mat4 getViewMatrix();
 	glm::mat4 getRotationMatrix();
+	glm::vec3 getPosition();
+	glm::vec3 getForward();
+
 
 	void processSDLEvent(SDL_Event& e);
 

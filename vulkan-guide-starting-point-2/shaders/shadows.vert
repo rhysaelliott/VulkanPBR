@@ -24,6 +24,7 @@ layout(push_constant) uniform constants
 	VertexBuffer vertexBuffer;
 } PushConstants;
 
+
 void main()
 {
 	Vertex v = PushConstants.vertexBuffer.vertices[gl_VertexIndex];

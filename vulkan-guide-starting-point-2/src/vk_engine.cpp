@@ -12,6 +12,7 @@
 #include <vk_initializers.h>
 #include <vk_types.h>
 #include <vk_images.h>
+#include <glm/gtc/type_ptr.hpp>
 
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
@@ -120,7 +121,7 @@ void VulkanEngine::init()
 
     init_imgui();
 
-    std::string structurePath = { "..\\..\\assets\\structure.glb" };
+    std::string structurePath = { "..\\..\\assets\\test.glb" };
     auto structureFile = loadGltf(this, structurePath);
 
     assert(structureFile.has_value());
@@ -249,8 +250,8 @@ void VulkanEngine::init_swapchain()
     VK_CHECK(vkCreateImageView(_device, &dviewInfo, nullptr, &_depthImage.imageView));
 
     //create shadow image
-    _shadowImage.imageFormat = VK_FORMAT_D32_SFLOAT;
-    _shadowImage.imageExtent = VkExtent3D(drawImageExtent.width / 2, drawImageExtent.height / 2, 1);
+    _shadowImage.imageFormat = VK_FORMAT_D16_UNORM;
+    _shadowImage.imageExtent = VkExtent3D(1024, 1024, 1);
     VkImageUsageFlags shadowImageUsage{};
     shadowImageUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     shadowImageUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -364,7 +365,7 @@ void VulkanEngine::init_descriptors()
     {
         DescriptorLayoutBuilder builder;
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        _gpuLightDataDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+        _gpuLightDataDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT |VK_SHADER_STAGE_FRAGMENT_BIT);
     }
 
     {
@@ -609,9 +610,9 @@ void VulkanEngine::init_default_data()
     LightStruct light1 = {};
     light1.lightType = SpotLight;
     light1.cone = 50.0f;
-    light1.direction = glm::vec3(90.0f, 0.f, 0.f);
+    light1.direction = glm::vec3(0.0f, -1.0f, -1.0f);
     light1.color = glm::vec3 (1.5f, 0.f, 0.f);
-    light1.position = glm::vec3(30.f, 0, -85.f);
+    light1.position = glm::vec3(0.f, 0, 0.f);
     light1.range = 1500.f;
     light1.constant = 0.0f;
     light1.linear = 0.1f;
@@ -919,10 +920,17 @@ void VulkanEngine::update_scene()
     mainCamera.update();
     sceneData.view = mainCamera.getViewMatrix();
 
+
     sceneData.proj = glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
 
     sceneData.proj[1][1] *= -1;
     sceneData.viewproj = sceneData.proj * sceneData.view;
+
+    if (!mainCamera.isActive)
+    {
+        //sceneLights[0].position = mainCamera.getPosition();
+        //sceneLights[0].direction = mainCamera.getForward();
+    }
 
     sceneData.ambientColor = glm::vec4(.1f);
     sceneData.sunlightColor = glm::vec4(0.5f);
@@ -1047,14 +1055,24 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd, LightStruct& light)
         vkinit::shadow_rendering_info(VkExtent2D(light.shadowMap.imageExtent.width, light.shadowMap.imageExtent.height), &depthAttachment);
     vkCmdBeginRendering(cmd, &renderInfo);
 
-    glm::vec3 lightPos = light.position;
-    glm::mat4 lightView = glm::lookAt(lightPos, light.direction, glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 lightProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
+    float nearPlane = 1.0f;
+    float farPlane = 10.f;
+    light.direction = glm::normalize(glm::vec3(0.0f) - light.position);
 
-    sort_opaque_draws(lightProj * lightView);
+    glm::mat4 lightView = glm::lookAt(
+        light.position,
+        glm::vec3(0.f),
+        glm::vec3(0.0f, 1.0f, 0.0f)     
+    );
 
-    //todo sort out properly
+
+    float fov = glm::radians(light.cone);
+    glm::mat4 lightProj = glm::perspective(fov, 1.0f, 96.0f ,1.0f);
+    lightProj[1][1] *= -1.0f;
+
     light.viewproj = lightProj * lightView;
+
+    sort_opaque_draws(light.viewproj);
 
     AllocatedBuffer gpuShadowDataBuffer = create_buffer(sizeof(GPUShadowDrawBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
@@ -1089,9 +1107,14 @@ void VulkanEngine::draw_shadows(VkCommandBuffer cmd, LightStruct& light)
     scissor.extent.height = light.shadowMap.imageExtent.height;
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
+    float depthBiasConstant = 1.25f;
+    // Slope depth bias factor, applied depending on polygon's slope
+    float depthBiasSlope = 1.75f;
 
     auto draw = [&](const RenderObject& draw)
         {
+            vkCmdSetDepthBias(cmd, depthBiasConstant, 0.0f, depthBiasSlope);
+
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->shadowPipeline->pipeline);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->shadowPipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
 
@@ -1271,7 +1294,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
             {
                 //if (is_light_affecting_object(l, draw) == true)
                 {
-                    if (lightData.numLights < 10)
+                    if (lightData.numLights < 1)
                     {
                         GPULightStruct gpuLight;
                         l.CopyToGPU(gpuLight);
@@ -1387,13 +1410,18 @@ void VulkanEngine::run()
                 }
                 if (e.key.keysym.sym == SDLK_1)
                 {
-                    if (SDL_GetRelativeMouseMode() == SDL_TRUE)
+                    if (e.key.keysym.sym == SDLK_1)
                     {
-                        SDL_SetRelativeMouseMode(SDL_FALSE);
-                    }
-                    else
-                    {
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        if (SDL_GetRelativeMouseMode() == SDL_TRUE)
+                        {
+                            SDL_SetRelativeMouseMode(SDL_FALSE);
+                            mainCamera.isActive = false;
+                        }
+                        else
+                        {
+                            SDL_SetRelativeMouseMode(SDL_TRUE);
+                            mainCamera.isActive = true;
+                        }
                     }
                 }
             }
@@ -1431,6 +1459,36 @@ void VulkanEngine::run()
         {
             if (ImGui::BeginTabBar("debugging"))
             {
+                if (ImGui::BeginTabItem("light"))
+                {
+                    LightStruct& light = sceneLights[0];
+
+                    ImGui::Text("Transform");
+                    ImGui::DragFloat3("Position", glm::value_ptr(light.position), 0.1f);
+                    ImGui::DragFloat3("Direction", glm::value_ptr(light.direction), 0.01f, -1.0f, 1.0f);
+
+                    ImGui::Separator();
+                    ImGui::Text("Light Properties");
+
+
+                    ImGui::ColorEdit3("Color", glm::value_ptr(light.color));
+                    ImGui::DragFloat("Intensity", &light.intensity, 0.1f, 0.0f, 10000.0f);
+                    ImGui::DragFloat("Range", &light.range, 1.0f, 0.0f, 5000.0f);
+
+                    //spot light
+                    if (light.lightType == 1)
+                    {
+                        ImGui::DragFloat("Cone Angle (deg)", &light.cone, 1.0f, 1.0f, 90.0f);
+                    }
+
+                    ImGui::Separator();
+                    ImGui::Text("Attenuation");
+                    ImGui::DragFloat("Constant", &light.constant, 0.01f, 0.0f, 1.0f);
+                    ImGui::DragFloat("Linear", &light.linear, 0.01f, 0.0f, 1.0f);
+                    ImGui::DragFloat("Quadratic", &light.quadratic, 0.01f, 0.0f, 1.0f);
+                    ImGui::EndTabItem();
+                }
+
                 if (ImGui::BeginTabItem("background"))
                 {
                     ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.f);

@@ -17,8 +17,23 @@ glm::mat4 Camera::getRotationMatrix()
 	return glm::toMat4(yawRotation) * glm::toMat4(pitchRotation);
 }
 
+glm::vec3 Camera::getPosition()
+{
+	return position;
+}
+
+glm::vec3 Camera::getForward()
+{
+	glm::mat4 rot = getRotationMatrix();
+
+	glm::vec3 forward = glm::vec3(rot * glm::vec4(0, 0, -1, 0));
+
+	return glm::normalize(forward);
+}
+
 void Camera::processSDLEvent(SDL_Event& e)
 {
+	if (!isActive) return;
 	if (e.type == SDL_KEYDOWN)
 	{
 		if (e.key.keysym.sym == SDLK_w) { velocity.z = -1; }
@@ -47,6 +62,7 @@ void Camera::processSDLEvent(SDL_Event& e)
 
 void Camera::update()
 {
+	if (!isActive) return;
 	glm::mat4 cameraRotation = getRotationMatrix();
 	position += glm::vec3(cameraRotation * glm::vec4(velocity * 0.1f, 0.f));
 

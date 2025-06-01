@@ -239,4 +239,6 @@ private:
 
 	std::vector<uint32_t> opaqueDraws;
 	void sort_opaque_draws(glm::mat4 viewproj);
+	bool test = true;
+	glm::mat4 testlightViewProj;
 };
